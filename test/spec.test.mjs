@@ -123,3 +123,15 @@ test('gateState: pending until a human approves, failure only for violations', (
   assert.equal(gateState({ errors: [], humanRequired: ['spec/ PRs need human approval'], approved: true }).state, 'success');
   assert.equal(gateState({ errors: [], humanRequired: [], approved: false }).state, 'success');
 });
+
+import { reviewersToRerequest } from '../src/gate.mjs';
+
+test('reviewersToRerequest: dismissed or older-commit approvals, not already requested', () => {
+  const r = (login, state, commit_id, type = 'User') => ({ user: { login, type }, state, commit_id });
+  assert.deepEqual(reviewersToRerequest([r('zach', 'DISMISSED', 'old')], 'new', 'app'), ['zach']);
+  assert.deepEqual(reviewersToRerequest([r('zach', 'APPROVED', 'old')], 'new', 'app'), ['zach']);
+  assert.deepEqual(reviewersToRerequest([r('zach', 'APPROVED', 'new')], 'new', 'app'), []); // current approval
+  assert.deepEqual(reviewersToRerequest([r('zach', 'DISMISSED', 'old')], 'new', 'app', ['zach']), []); // already asked
+  assert.deepEqual(reviewersToRerequest([r('bot', 'DISMISSED', 'old', 'Bot'), r('app', 'DISMISSED', 'old')], 'new', 'app'), []);
+  assert.deepEqual(reviewersToRerequest([r('zach', 'DISMISSED', 'old'), r('zach', 'APPROVED', 'new')], 'new', 'app'), []); // superseded
+});

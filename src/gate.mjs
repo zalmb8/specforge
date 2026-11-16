@@ -80,6 +80,19 @@ export function gateState({ errors, humanRequired, approved }) {
   return { state: 'success', description: humanRequired.length ? 'Approved by a human' : 'No human approval required' };
 }
 
+// Humans whose approval no longer counts and who should be asked again: their latest review was
+// dismissed (GitHub does that on a push), or approved an older commit. GitHub does not re-request
+// them itself. `alreadyRequested` is skipped so repeated gate runs do not nag.
+export function reviewersToRerequest(reviews, headSha, prAuthor, alreadyRequested = []) {
+  const latest = new Map();
+  for (const r of reviews) latest.set(r.user?.login, r);
+  return [...latest.values()]
+    .filter((r) => r.user?.type === 'User' && r.user.login !== prAuthor
+      && (r.state === 'DISMISSED' || (r.state === 'APPROVED' && r.commit_id !== headSha)))
+    .map((r) => r.user.login)
+    .filter((login) => !alreadyRequested.includes(login));
+}
+
 export function hasHumanApproval(reviews, prAuthor, headSha) {
   const latest = new Map();
   for (const r of reviews) latest.set(r.user?.login, r);
