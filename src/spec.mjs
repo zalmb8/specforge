@@ -5,7 +5,7 @@ export const STATUSES = ['draft', 'refining', 'approved', 'implementing', 'done'
 
 // Legal status moves between base (main) and head. Staying put is always legal.
 const TRANSITIONS = {
-  draft: ['refining'],
+  draft: ['refining', 'approved'], // a refine PR goes straight from main's draft to approved
   refining: ['draft', 'approved'],
   approved: ['refining', 'implementing'],
   implementing: ['approved', 'done'],
