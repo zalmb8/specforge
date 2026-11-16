@@ -7374,7 +7374,8 @@ var TRANSITIONS = {
   draft: ["refining", "approved"],
   // a refine PR goes straight from main's draft to approved
   refining: ["draft", "approved"],
-  approved: ["refining", "implementing"],
+  approved: ["refining", "implementing", "done"],
+  // a build PR goes straight from main's approved to done
   implementing: ["approved", "done"],
   done: []
 };
@@ -7416,6 +7417,19 @@ function validateSpec(text, { baseText } = {}) {
     if (seen.has(ac.id)) errors.push(`duplicate acceptance id ${ac.id}`);
     seen.add(ac.id);
     if (!ac.text) errors.push(`${ac.id}: text is required`);
+  }
+  if (data.depends_on !== void 0) {
+    const deps = data.depends_on;
+    if (!Array.isArray(deps)) errors.push("depends_on must be a list of spec ids");
+    else {
+      const seenDep = /* @__PURE__ */ new Set();
+      for (const d of deps) {
+        if (typeof d !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(d)) errors.push(`depends_on entry ${JSON.stringify(d)} is not a spec id`);
+        else if (d === data.id) errors.push("a spec cannot depend on itself");
+        else if (seenDep.has(d)) errors.push(`duplicate depends_on entry ${d}`);
+        seenDep.add(d);
+      }
+    }
   }
   const open = openQuestions(body);
   if (BINDING.includes(data.status)) {

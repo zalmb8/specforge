@@ -11,4 +11,6 @@ loops:
   ci_fix_max: 5
   code_review_max: 3
 review_lenses: []            # EXTRA lenses: names of files in .specforge/lenses/. All built-in lenses always run.
-exclude_lenses: []           # built-in lenses to skip, by name
+exclude_lenses: []           # built-in spec lenses to skip, by name
+code_review_lenses: []       # EXTRA code lenses for the build flow: files in .specforge/lenses/code/
+exclude_code_lenses: []      # built-in code lenses to skip, by name

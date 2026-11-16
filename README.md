@@ -11,9 +11,9 @@ idea  ->  draft spec  ->  refined, approved spec  ->  built, verified, merged
 |---|---|---|---|
 | **idea** | `idea/<slug>` | GitHub, once the gate passes | none |
 | **refine** | `spec/<slug>` | GitHub, once you approve the PR | answer open questions, approve the spec, approve the PR |
-| **build** | `build/<slug>` | GitHub, once checks pass | only if the spec's acceptance criteria must change |
+| **build** | `build/<slug>` | GitHub, once the gate passes (spec `done` with passing AC evidence) | only if the spec's acceptance criteria must change, or something is refused |
 
-**Status:** `idea`, `refine`, the gate, `init` and `sweep` work. `build` is not implemented yet.
+**Status:** all three flows, the gate, `init` and `sweep` are implemented.
 
 **Contents:** [How it works](#how-it-works) · [One-time setup](#one-time-setup) · [Adopt a repo](#adopt-a-repo) · [Day to day](#day-to-day) · [Keeping it updated](#keeping-it-updated) · [Configuration](#configuration) · [Troubleshooting](#troubleshooting) · [Private repos on free plans](#private-repos-on-free-plans) · [Development](#development)
 
@@ -23,7 +23,8 @@ idea  ->  draft spec  ->  refined, approved spec  ->  built, verified, merged
 - **A gate decides what each PR needs, by branch prefix.** It reports one commit status, `specforge/gate`, that branch protection requires:
   - `idea/`: may only add draft specs under `specs/`. No human needed.
   - `spec/`: needs an approving review from a human who is not the PR author, **on the current head commit**. The status stays `pending` until then.
-  - `build/`: needs a human only if acceptance criteria or protected paths change.
+  - `build/`: needs a human only if acceptance criteria, `depends_on` or protected paths change. It also refuses a build whose dependencies are not `done`, and stays `pending` until the spec is `done` and committed AC evidence passes (see [Build](#build)).
+- **Specs can depend on each other.** `depends_on` lists the ids of specs that must be `done` before this one can be built. The validator and gate check the whole tree: every id must exist and there must be no cycles. A spec can be renamed or removed only while it is `draft` or `approved`, and only if no spec still points at the old id, so a rename PR must update every referrer. `implementing` and `done` specs keep their names.
 - **GitHub does the merging.** Agents open the PR, enable native auto-merge as the GitHub App, and stop. Nothing polls or waits. Branch protection, stale-approval dismissal, CODEOWNERS review requests and branch deletion are all native GitHub features.
 - **Reviewers are independent.** A spec is reviewed by fresh agents that did not write it and have no author context, one per lens (testability, scope and risk, codebase fit, consistency). They read the codebase, because a spec cannot be judged without it.
 - **Agents act as your GitHub App, never as you.** If the app is refused, they stop and ask.
@@ -45,7 +46,7 @@ Specforge's agents open PRs, push branches and enable auto-merge as an App, so t
 
 1. GitHub, Settings, Developer settings, GitHub Apps, **New GitHub App**.
 2. Give it a name. Uncheck **Webhook > Active**. Set **Where can this app be installed** to *Only on this account*.
-3. Repository permissions: **Contents** read and write, **Pull requests** read and write, **Checks** read, **Commit statuses** read, **Metadata** read. Nothing else (agents only read checks and statuses, to see whether the gate passed). In particular do **not** give it Workflows or Administration: agents must not edit workflows or loosen protection.
+3. Repository permissions: **Contents** read and write, **Pull requests** read and write, **Checks** read, **Commit statuses** read, **Actions** read, **Metadata** read. Nothing else. Agents read checks and statuses to see whether the gate passed, and Actions logs to fix failing CI in the build flow. In particular do **not** give it Workflows or Administration: agents must not edit workflows or loosen protection.
 4. Create it and note the **App ID**.
 5. On the App page, **Generate a private key**. A `.pem` file downloads. It can be downloaded only once; you can always generate another.
 6. Put the key in your keychain and delete the file:
@@ -113,7 +114,18 @@ If someone pushes to the PR after you approve it, GitHub dismisses your approval
 
 ### Build
 
-Not implemented yet. The plan: an agent implements an approved spec on a `build/<slug>` branch, loops on code review and CI, verifies every acceptance criterion with evidence on the PR, and merges. Editing the acceptance criteria or a protected path will escalate to you.
+Run **`/specforge:build <slug>`** (a unique prefix works; with no argument you get the `approved` specs). The kickoff session checks that every spec in `depends_on` is `done` (it refuses, and tells you which is not, if not), creates a `build/<slug>` worktree and launches an agent that **works unattended**. It flags its Orca workspace and asks you there only when it must. The agent:
+
+1. sets the spec to `implementing` and **writes the tests first**: it creates the thing each criterion's `verify` target names and confirms it fails before implementing;
+2. implements until your `commands.test` and `commands.lint` pass;
+3. runs independent code reviewers, one per lens (correctness, test quality, resiliency, AI best practices), up to `loops.code_review_max` rounds. It fixes valid findings, pushes back on wrong ones with a reason, and treats a finding that implies a spec change as an escalation;
+4. opens the PR as the App and enables auto-merge. The gate stays `pending`;
+5. watches CI in the background and fixes failures from the logs, up to `loops.ci_fix_max` rounds;
+6. sets the spec to `done`, then an independent `ac-verifier` agent runs every `verify` target itself and commits `specs/evidence/<slug>.json`, recording the commit it verified. It posts the results table on the PR. Any later change invalidates the evidence.
+
+The gate turns `success`, and GitHub merges the PR, only when the spec is `done`, every criterion has passing evidence for its exact `verify` text, and nothing but the evidence file changed since it was recorded. CI still runs your tests, which is the real enforcement; the evidence is the attestation.
+
+**You are only pulled in when** a dependency is not done, an acceptance criterion cannot be met as written (the agent proposes an amendment and the PR then needs your approval), a permission is refused, a loop cap is reached, or the PR touches a protected path. A build that needs to change `.github/workflows` cannot be done autonomously, because the App cannot push workflow files.
 
 ### Clean up
 
@@ -153,10 +165,12 @@ To check where a repo stands: the version in `claude plugin list`, the `@v` tag 
 | `protected_paths` | Extra regexes (for example `^migrations/`) that always need a human on a `build/` PR. `.github/`, `.specforge/` and `CODEOWNERS` always do. |
 | `commands.test`, `commands.lint` | Used by the build flow. Leave a command empty if the repo has none. |
 | `loops.spec_review_max` | Review rounds in refine (default 3). `ci_fix_max` and `code_review_max` are for the build flow. |
-| `review_lenses` | Names of **extra** lenses, from `.specforge/lenses/<name>.md`. |
-| `exclude_lenses` | Built-in lenses to skip, by name. |
+| `review_lenses` | Names of **extra spec lenses**, from `.specforge/lenses/spec/<name>.md`. |
+| `exclude_lenses` | Built-in spec lenses to skip, by name. |
+| `code_review_lenses` | Names of **extra code lenses** for the build flow, from `.specforge/lenses/code/<name>.md`. |
+| `exclude_code_lenses` | Built-in code lenses to skip, by name. |
 
-All built-in lenses (`lenses/*.md`) run every time, so plugin updates add lenses without a config change. To add your own, write `.specforge/lenses/<name>.md`: a short description of what to check and what counts as a finding, then list `<name>` under `review_lenses`. A repo file with a built-in's name replaces that built-in.
+All built-in lenses run every time (`lenses/spec/` for specs: testability, scope-risk, codebase-fit, consistency; `lenses/code/` for builds: correctness, test-quality, resiliency, ai-best-practices), so plugin updates add lenses without a config change. To add your own, write `.specforge/lenses/spec/<name>.md` or `.specforge/lenses/code/<name>.md`: a short description of what to check and what counts as a finding, then list `<name>` under `review_lenses` or `code_review_lenses`. A repo file with a built-in's name replaces that built-in.
 
 ## Troubleshooting
 
@@ -167,6 +181,8 @@ All built-in lenses (`lenses/*.md`) run every time, so plugin updates add lenses
 | `specforge/gate` never appears | The caller workflow is not on the default branch yet, or the repo's Actions are disabled. |
 | Auto-merge refused with an "upgrade" message | The repo is private on a free plan. See below. |
 | `gh pr merge` says the requirements are not met | Working as intended: the gate is red or pending and protection is enforcing it. Fix the cause. |
+| A `build/` PR sits `pending` | Read the gate status description. `spec ... is implementing, not done yet`: the build is still running. `AC evidence: ...`: the evidence is missing, a criterion failed or its `verify` text differs, or files changed after verification; the agent must re-verify. |
+| The gate fails with `depends_on ... is not done` or `... does not exist` | A prerequisite spec is not `done`, or a rename or deletion left a dangling reference. Finish the prerequisite, or update every spec that points at the old id in the same PR. |
 | A worker stops and asks to read a file | The repo's `.claude/settings.local.json` is missing the plugin directory. Run `/specforge:init` on this machine. |
 | An idea or refine session reports success but nothing happens | The agent's prompt was not delivered. Check the worktree's terminal in Orca; a started agent with an empty prompt sits idle. Relaunch the flow. |
 | `git fetch` fails inside a flow | The flow stops on purpose rather than using a stale base. Fix credentials (`gh auth status`) and retry. |
@@ -194,8 +210,8 @@ The repo is its own marketplace. `dist/` is committed (esbuild bundles) so consu
 ```
 .claude-plugin/   plugin and marketplace manifests
 skills/           idea, refine, build, init, sweep
-agents/           spec-reviewer
-lenses/           one review lens per file
+agents/           spec-reviewer, code-reviewer, ac-verifier
+lenses/           spec/ and code/, one review lens per file
 src/ dist/        validator, gate, sweep, token minting
 .github/workflows reusable gate workflow, CI
 templates/        spec, config, gate caller

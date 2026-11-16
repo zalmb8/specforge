@@ -1,6 +1,6 @@
 ---
 name: spec-reviewer
-description: Independent reviewer of a specforge spec. Give it the path to a spec file and the full text of exactly one lens (from lenses/ or .specforge/lenses/), never the author's reasoning or session context. It reads the codebase to judge the spec. Returns findings for the caller to triage.
+description: Independent reviewer of a specforge spec. Give it the path to a spec file and the full text of exactly one lens (from lenses/spec/ or .specforge/lenses/spec/), never the author's reasoning or session context. It reads the codebase to judge the spec. Returns findings for the caller to triage.
 tools: Read, Grep, Glob
 ---
 

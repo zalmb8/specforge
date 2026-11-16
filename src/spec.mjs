@@ -7,7 +7,7 @@ export const STATUSES = ['draft', 'refining', 'approved', 'implementing', 'done'
 const TRANSITIONS = {
   draft: ['refining', 'approved'], // a refine PR goes straight from main's draft to approved
   refining: ['draft', 'approved'],
-  approved: ['refining', 'implementing'],
+  approved: ['refining', 'implementing', 'done'], // a build PR goes straight from main's approved to done
   implementing: ['approved', 'done'],
   done: [],
 };
@@ -57,6 +57,20 @@ export function validateSpec(text, { baseText } = {}) {
     if (!ac.text) errors.push(`${ac.id}: text is required`);
   }
 
+  if (data.depends_on !== undefined) {
+    const deps = data.depends_on;
+    if (!Array.isArray(deps)) errors.push('depends_on must be a list of spec ids');
+    else {
+      const seenDep = new Set();
+      for (const d of deps) {
+        if (typeof d !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(d)) errors.push(`depends_on entry ${JSON.stringify(d)} is not a spec id`);
+        else if (d === data.id) errors.push('a spec cannot depend on itself');
+        else if (seenDep.has(d)) errors.push(`duplicate depends_on entry ${d}`);
+        seenDep.add(d);
+      }
+    }
+  }
+
   const open = openQuestions(body);
   if (BINDING.includes(data.status)) {
     if (open > 0) errors.push(`${data.status} spec has ${open} open question(s)`);
@@ -81,4 +95,31 @@ export function validateSpec(text, { baseText } = {}) {
   }
 
   return { errors, data, open };
+}
+
+/**
+ * Checks the whole dependency tree: every depends_on must name an existing spec, and there must
+ * be no cycles. specs: [{ id, depends_on? }]. Returns a list of error strings.
+ */
+export function validateTree(specs) {
+  const errors = [];
+  const byId = new Map(specs.map((s) => [s.id, s]));
+  for (const s of specs) {
+    for (const d of s.depends_on ?? []) {
+      if (!byId.has(d)) errors.push(`${s.id}: depends_on "${d}" does not exist`);
+    }
+  }
+  const state = new Map(); // 1 = on the current path, 2 = done
+  const walk = (id, path) => {
+    if (state.get(id) === 2) return;
+    if (state.get(id) === 1) {
+      errors.push(`dependency cycle: ${[...path.slice(path.indexOf(id)), id].join(' -> ')}`);
+      return;
+    }
+    state.set(id, 1);
+    for (const d of byId.get(id)?.depends_on ?? []) if (byId.has(d)) walk(d, [...path, id]);
+    state.set(id, 2);
+  };
+  for (const s of specs) walk(s.id, []);
+  return [...new Set(errors)];
 }
