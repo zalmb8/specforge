@@ -1,3 +1,5 @@
+import{createRequire}from'module';const require=createRequire(import.meta.url);
+
 // src/sweep.mjs
 import { execFileSync } from "node:child_process";
 var args = process.argv.slice(2);
