@@ -63,4 +63,10 @@ templates/   spec, config, gate caller
 .github/     reusable gate workflow (gate.yml), CI
 ```
 
-Specforge does not yet run its own gate; its `.specforge/config.yml` `protected_paths` describe the intent for when the build flow lets it develop itself. Until then its own PRs need only the `test` check.
+## Self-hosting
+
+Specforge runs its own gate: `.github/workflows/specforge-gate.yml` calls `zalmb8/specforge/.github/workflows/gate.yml@v0`, never the local `./` form, so a PR cannot change the gate that judges it. Development uses the last released plugin (`.claude/settings.json` enables it from the marketplace), not the working tree. `build/` PRs that touch `protected_paths` wait for the human; that is the intended safety property. `README.md` and `docs/` are unprotected.
+
+- No build flow may tag, move `v0`, or bump versions on its own. Releases are a human step or an explicit instruction (see Releasing).
+- The app never gets Workflows or Administration. Pushing workflow files and changing branch protection are human steps.
+- **Escape hatch:** if a bug in the released gate blocks every PR, including its fix, the repo admin merges the fix with the bypass (`enforce_admins` stays false), then a release is cut. If `main` is wedged, the admin may also drop `specforge/gate` from the required contexts and fix forward. Never delete the caller workflow to unblock: that removes the status protection requires.

@@ -207,6 +207,8 @@ Working versions of all four were built for this plugin and live at tag [`v0.5.0
 
 The repo is its own marketplace. `dist/` is committed (esbuild bundles) so consumers need no install step; run `npm run build` after changing `src/`, and `npm test`, which also runs the real bundles. Agents working in the repo should read [`CLAUDE.md`](CLAUDE.md); the reasoning behind the design is in [`docs/design.md`](docs/design.md).
 
+Specforge runs its own gate, pinned to the last released `@v0` and not the working tree. `build/` PRs that touch the plugin's rails (`src/`, `dist/`, `skills/`, `agents/`, `lenses/`, `templates/`, manifests, `CLAUDE.md`, `package*.json`, `test/`) wait for a human approval; docs-only PRs do not. Releases stay manual.
+
 ```
 .claude-plugin/   plugin and marketplace manifests
 skills/           idea, refine, build, init, sweep

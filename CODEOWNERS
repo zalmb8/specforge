@@ -1,2 +1,16 @@
-# Changes to the automation itself always need a human.
-* @zalmb8
+# Changes to specs and to the automation itself always need a human.
+specs/ @zalmb8
+/src/ @zalmb8
+/dist/ @zalmb8
+/skills/ @zalmb8
+/agents/ @zalmb8
+/lenses/ @zalmb8
+/templates/ @zalmb8
+/.claude-plugin/ @zalmb8
+/CLAUDE.md @zalmb8
+/package.json @zalmb8
+/package-lock.json @zalmb8
+/test/ @zalmb8
+/.github/ @zalmb8
+/.specforge/ @zalmb8
+/CODEOWNERS @zalmb8

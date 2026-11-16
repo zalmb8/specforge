@@ -2,12 +2,18 @@ specforge: 1
 spec_dir: specs
 default_branch: main
 # specforge's own safety rails: the build flow must never auto-merge edits to these.
+# (.github/, .specforge/ and CODEOWNERS are always protected by default.)
 protected_paths:
   - ^src/
   - ^dist/
   - ^skills/
   - ^agents/
+  - ^lenses/
+  - ^templates/
   - ^\.claude-plugin/
+  - ^CLAUDE\.md$
+  - ^package(-lock)?\.json$
+  - ^test/
 commands:
   test: npm test
   lint: ""
