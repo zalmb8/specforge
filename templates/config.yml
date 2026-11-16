@@ -10,4 +10,5 @@ loops:
   spec_review_max: 3
   ci_fix_max: 5
   code_review_max: 3
-review_lenses: [testability, scope-risk, codebase-fit, consistency]   # names of lenses/*.md or .specforge/lenses/*.md
+review_lenses: []            # EXTRA lenses: names of files in .specforge/lenses/. All built-in lenses always run.
+exclude_lenses: []           # built-in lenses to skip, by name

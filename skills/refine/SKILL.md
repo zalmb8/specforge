@@ -40,7 +40,7 @@ You are the kickoff session. The refinement itself happens in its own Orca works
 > **3. Make it verifiable.** Replace every `verify: TBD` with a concrete target: a test path and name, or a command with an expected result. Ask the user where a target is a real choice.
 >
 > **4. Independent review loop**, at most `loops.spec_review_max` rounds. Each round:
-> - Spawn one `spec-reviewer` agent per lens in `review_lenses`, in parallel. Each gets the path to the spec and the full text of exactly one lens, read from `.specforge/lenses/<name>.md` if it exists, else `PLUGIN/lenses/<name>.md`. Pass no reasoning, no history, no summary of the conversation.
+> - Spawn one `spec-reviewer` agent per lens, in parallel. The lenses are every file in `PLUGIN/lenses/` plus any extra names in `review_lenses` (read from `.specforge/lenses/<name>.md`; a repo file with a built-in's name replaces it; drop names listed in `exclude_lenses`; no duplicates). Each reviewer gets the path to the spec and the full text of exactly one lens. Pass no reasoning, no history, no summary of the conversation.
 > - Triage every finding yourself, and record the verdict:
 >   - **Valid**: fix it in the spec.
 >   - **Wrong**: push back. Write one line saying why, citing the code or the spec; it goes in the PR description.
