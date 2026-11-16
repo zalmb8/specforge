@@ -31,9 +31,7 @@ for (const w of candidates) {
     if (head !== pr.headRefOid) { stuck.push(`${label}: local commits differ from merged PR ${pr.url}`); continue; }
     if (run('git', ['status', '--porcelain'], { cwd: w.path }).trim()) { stuck.push(`${label}: uncommitted changes`); continue; }
     if (apply) {
-      // Remote first: gh needs the worktree's cwd, which `worktree rm` deletes. Repos without
-      // "delete head branches" leave the remote branch behind; an error here means it is already gone.
-      try { run('gh', ['api', '-X', 'DELETE', `repos/{owner}/{repo}/git/refs/heads/${branch}`], { cwd: w.path }); } catch {}
+      // The remote branch is deleted by GitHub ("automatically delete head branches"), which init enables.
       run('orca', ['worktree', 'rm', '--worktree', `id:${w.id}`, '--delete-branch', '--json']);
     }
     removed.push(label);
