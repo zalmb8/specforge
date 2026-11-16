@@ -1,0 +1,32 @@
+name: specforge gate (reusable)
+on:
+  workflow_call:
+    inputs:
+      specforge_ref:
+        description: Tag of specforge whose dist/ to run. Keep in step with the @ref the caller uses.
+        type: string
+        default: v0
+jobs:
+  gate:
+    name: specforge/gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: zalmb8/specforge
+          ref: ${{ inputs.specforge_ref }}
+          path: .specforge-tool
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Gate
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: node .specforge-tool/dist/gate-cli.mjs

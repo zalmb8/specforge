@@ -1,0 +1,18 @@
+specforge: 1
+spec_dir: specs
+default_branch: main
+# specforge's own safety rails: the build flow must never auto-merge edits to these.
+protected_paths:
+  - ^src/
+  - ^dist/
+  - ^skills/
+  - ^agents/
+  - ^\.claude-plugin/
+commands:
+  test: npm test
+  lint: ""
+loops:
+  spec_review_max: 3
+  ci_fix_max: 5
+  code_review_max: 3
+review_lenses: [testability, scope-risk, codebase-fit]

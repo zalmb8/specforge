@@ -1,0 +1,11 @@
+{
+  "name": "specforge",
+  "owner": { "name": "zalmb8" },
+  "plugins": [
+    {
+      "name": "specforge",
+      "source": "./",
+      "description": "Spec-driven lifecycle workflows on Orca worktrees"
+    }
+  ]
+}
