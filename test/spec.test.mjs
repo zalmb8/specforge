@@ -114,3 +114,12 @@ test('human approval counts only for the current head commit', () => {
   assert.equal(hasHumanApproval([r('zach', 'aaa')], 'app[bot]'), true); // no head sha known: not enforced
 });
 
+
+import { gateState } from '../src/gate.mjs';
+
+test('gateState: pending until a human approves, failure only for violations', () => {
+  assert.equal(gateState({ errors: ['x'], humanRequired: [], approved: false }).state, 'failure');
+  assert.equal(gateState({ errors: [], humanRequired: ['spec/ PRs need human approval'], approved: false }).state, 'pending');
+  assert.equal(gateState({ errors: [], humanRequired: ['spec/ PRs need human approval'], approved: true }).state, 'success');
+  assert.equal(gateState({ errors: [], humanRequired: [], approved: false }).state, 'success');
+});

@@ -1,6 +1,6 @@
 {
   "name": "specforge",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Idea-to-merged-PR lifecycle: draft specs, refine them, build them, driven through Orca worktrees and a GitHub App.",
   "author": { "name": "zalmb8" }
 }
