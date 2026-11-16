@@ -135,3 +135,10 @@ test('decideMerge judges only the latest run of each check (gate re-run after ap
   // a newer run that has not finished means wait, even if an older one passed
   assert.equal(decideMerge([run(1, 'success'), { ...run(2, null), status: 'in_progress' }]).state, 'wait');
 });
+
+test('decideMerge ignores the merge job itself so it does not wait on its own check', () => {
+  const gate = { id: 1, name: 'gate / specforge/gate', status: 'completed', conclusion: 'success' };
+  const self = { id: 2, name: 'merge / merge', status: 'in_progress', conclusion: null };
+  assert.equal(decideMerge([gate, self]).state, 'wait');
+  assert.equal(decideMerge([gate, self], { ignoreJob: 'merge' }).state, 'merge');
+});

@@ -1,12 +1,13 @@
 import { decideMerge } from './merge.mjs';
 import { hasHumanApproval } from './gate.mjs';
 
-// usage: merge-pr <owner/repo> <pr-number> [--timeout-s 600]
+// usage: merge-pr <owner/repo> <pr-number> [--timeout-s 600] [--ignore-job <job name>]
 // Env: GH_TOKEN (an app installation token). Merges (squash) only when the gate and every check are green.
 // This is the only sanctioned way for agents to merge: repos without branch protection
 // (free private plans) get no server-side enforcement, so the script enforces it.
 const [repo, number, ...rest] = process.argv.slice(2);
 const timeoutS = Number(rest[rest.indexOf('--timeout-s') + 1]) || 600;
+const ignoreJob = rest.includes('--ignore-job') ? rest[rest.indexOf('--ignore-job') + 1] : undefined;
 if (!repo || !number || !process.env.GH_TOKEN) {
   console.error('usage: GH_TOKEN=... merge-pr <owner/repo> <pr-number> [--timeout-s N]');
   process.exit(2);
@@ -36,7 +37,7 @@ for (;;) {
     const reviews = await api(`/pulls/${number}/reviews?per_page=100`);
     awaitingHuman = !(reviews.ok && hasHumanApproval(reviews.body, pr.body.user.login));
   }
-  const verdict = decideMerge(runs.body.check_runs, { awaitingHuman });
+  const verdict = decideMerge(runs.body.check_runs, { awaitingHuman, ignoreJob });
 
   if (verdict.state === 'refuse') { console.error(`refusing to merge: ${verdict.reason}`); process.exit(1); }
   if (verdict.state === 'merge') {

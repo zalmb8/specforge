@@ -7373,8 +7373,9 @@ function latestPerName(runs) {
   }
   return [...latest.values()];
 }
-function decideMerge(allRuns, { awaitingHuman = false } = {}) {
-  const checkRuns = latestPerName(allRuns);
+function decideMerge(allRuns, { awaitingHuman = false, ignoreJob: ignoreJob2 } = {}) {
+  const others = ignoreJob2 ? allRuns.filter((r) => r.name !== ignoreJob2 && !r.name.endsWith(` / ${ignoreJob2}`)) : allRuns;
+  const checkRuns = latestPerName(others);
   const gate = checkRuns.find((r) => GATE.test(r.name));
   if (!gate) return { state: "wait", reason: "specforge/gate has not reported yet" };
   const pending = checkRuns.filter((r) => r.status !== "completed");
@@ -7402,6 +7403,7 @@ function hasHumanApproval(reviews, prAuthor) {
 // src/merge-pr.mjs
 var [repo, number, ...rest] = process.argv.slice(2);
 var timeoutS = Number(rest[rest.indexOf("--timeout-s") + 1]) || 600;
+var ignoreJob = rest.includes("--ignore-job") ? rest[rest.indexOf("--ignore-job") + 1] : void 0;
 if (!repo || !number || !process.env.GH_TOKEN) {
   console.error("usage: GH_TOKEN=... merge-pr <owner/repo> <pr-number> [--timeout-s N]");
   process.exit(2);
@@ -7440,7 +7442,7 @@ for (; ; ) {
     const reviews = await api(`/pulls/${number}/reviews?per_page=100`);
     awaitingHuman = !(reviews.ok && hasHumanApproval(reviews.body, pr.body.user.login));
   }
-  const verdict = decideMerge(runs.body.check_runs, { awaitingHuman });
+  const verdict = decideMerge(runs.body.check_runs, { awaitingHuman, ignoreJob });
   if (verdict.state === "refuse") {
     console.error(`refusing to merge: ${verdict.reason}`);
     process.exit(1);
