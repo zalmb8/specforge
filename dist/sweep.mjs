@@ -2,10 +2,15 @@ import{createRequire}from'module';const require=createRequire(import.meta.url);
 
 // src/sweep.mjs
 import { execFileSync } from "node:child_process";
+
+// src/prefixes.mjs
+var SWEEP_PREFIXES = ["idea/", "spec/", "build/", "archive/"];
+
+// src/sweep.mjs
 var args = process.argv.slice(2);
 var apply = args.includes("--apply");
 var prefixes = args.flatMap((a, i) => args[i - 1] === "--prefix" ? [a] : []);
-if (!prefixes.length) prefixes.push("idea/", "spec/", "build/");
+if (!prefixes.length) prefixes.push(...SWEEP_PREFIXES);
 var run = (cmd, a, opts = {}) => execFileSync(cmd, a, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...opts });
 var orca = (...a) => JSON.parse(run("orca", [...a, "--json"])).result;
 var { worktrees } = orca("worktree", "list");

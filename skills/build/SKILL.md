@@ -16,7 +16,7 @@ You are the kickoff session. The build itself runs in its own Orca workspace, in
    export GH_TOKEN=$(node PLUGIN/dist/mint-app-token.mjs)
    git -c credential.helper= -c "credential.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN; }; f" fetch origin main
    ```
-4. **Check dependencies.** Read the spec's `depends_on` on `origin/main`. Every listed spec must exist and be `done`. If any is not, stop and tell the user which, and what its status is. Do not create a worktree.
+4. **Check dependencies.** Read the spec's `depends_on` on `origin/main`. Each is the spec at `<spec_dir>/<id>.md` or `<spec_dir>/archive/<id>.md`, and every listed spec must exist and be `done`. If any is not, stop and tell the user which, and what its status is. Do not create a worktree.
 5. **Resume if possible.** If a worktree on `build/<id>` already exists (`orca worktree list --json`), tell the user where it is and stop.
 6. **Create the worktree with no agent yet**, write the brief into it, then launch:
    ```text
@@ -34,7 +34,7 @@ You are the kickoff session. The build itself runs in its own Orca workspace, in
 
 > You are the specforge build agent for spec `<id>` in `<owner/repo>`, on branch `build/<id>`. PLUGIN=`<literal plugin path>`; use it exactly as written. You work unattended. Touch the code the spec requires, `<spec_dir>/<id>.md`, and `<spec_dir>/evidence/<id>.json`; leave everything else alone, and never touch `.github/` (the app cannot push workflows, and the gate requires a human for it). Acting as the GitHub App is the only way you push or open PRs; **if the app is refused something, stop and ask the user, never fall back to their own credentials.**
 >
-> **1. Read** the spec, `.specforge/config.yml` and the codebase. Confirm `depends_on` specs are all `done` on `origin/main`; if not, stop and flag the user (step 9).
+> **1. Read** the spec, `.specforge/config.yml` and the codebase. Confirm `depends_on` specs, each at `<spec_dir>/<id>.md` or `<spec_dir>/archive/<id>.md`, are all `done` on `origin/main`; if not, stop and flag the user (step 9).
 >
 > **2. Start.** Set `status: implementing` in the spec and commit it (trailer `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`).
 >

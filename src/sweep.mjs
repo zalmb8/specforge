@@ -1,13 +1,14 @@
 import { execFileSync } from 'node:child_process';
+import { SWEEP_PREFIXES } from './prefixes.mjs';
 
 // usage: sweep [--apply] [--prefix idea/ ...]
-// Removes Orca worktrees for finished idea/, spec/ and build/ branches. Dry run unless --apply.
+// Removes Orca worktrees for finished idea/, spec/, build/ and archive/ branches. Dry run unless --apply.
 // A worktree is removed only if its PR merged at exactly the commit checked out here,
 // the tree is clean, and nothing is unpushed. Anything else is reported as stuck.
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
 const prefixes = args.flatMap((a, i) => (args[i - 1] === '--prefix' ? [a] : []));
-if (!prefixes.length) prefixes.push('idea/', 'spec/', 'build/');
+if (!prefixes.length) prefixes.push(...SWEEP_PREFIXES);
 
 const run = (cmd, a, opts = {}) => execFileSync(cmd, a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
 const orca = (...a) => JSON.parse(run('orca', [...a, '--json'])).result;

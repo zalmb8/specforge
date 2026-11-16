@@ -2,6 +2,7 @@
 specforge: 1
 spec_dir: specs
 default_branch: main
+archive: false               # true lets `archive` move done specs into <spec_dir>/archive/ (one archive/<id> PR each)
 protected_paths: []          # extra regexes that always need a human, e.g. ^migrations/
 commands:
   test: npm test

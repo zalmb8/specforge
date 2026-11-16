@@ -7364,7 +7364,6 @@ var require_dist = __commonJS({
 // src/gate-cli.mjs
 var import_yaml2 = __toESM(require_dist(), 1);
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 
 // src/spec.mjs
 var import_yaml = __toESM(require_dist(), 1);
@@ -7456,6 +7455,13 @@ function validateSpec(text, { baseText } = {}) {
 function validateTree(specs) {
   const errors2 = [];
   const byId = new Map(specs.map((s) => [s.id, s]));
+  if (byId.size !== specs.length) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const s of specs) {
+      if (seen.has(s.id)) errors2.push(`duplicate spec id "${s.id}"`);
+      seen.add(s.id);
+    }
+  }
   for (const s of specs) {
     for (const d of s.depends_on ?? []) {
       if (!byId.has(d)) errors2.push(`${s.id}: depends_on "${d}" does not exist`);
@@ -7481,6 +7487,14 @@ var DEFAULT_PROTECTED = ["^\\.github/", "^\\.specforge/", "^CODEOWNERS$"];
 var inSpecDir = (specDir2, p) => p.startsWith(`${specDir2}/`) && p.endsWith(".md");
 var acceptanceOf = (text) => JSON.stringify(parseSpec(text ?? "").data?.acceptance ?? null);
 var dependsOf = (text) => JSON.stringify(parseSpec(text ?? "").data?.depends_on ?? []);
+var archivePath = (specDir2, id) => `${specDir2}/archive/${id}.md`;
+var archiveEvidencePath = (specDir2, id) => `${specDir2}/archive/evidence/${id}.json`;
+var isArchived = (specDir2, p) => p.startsWith(`${specDir2}/archive/`) && /\.(md|json)$/.test(p);
+var archivedId = (specDir2, p) => {
+  const rest = p.slice(`${specDir2}/archive/`.length);
+  const m = /^(?:evidence\/([^/]+)\.json|([^/]+)\.md)$/.exec(rest);
+  return m ? m[1] ?? m[2] : void 0;
+};
 var evidencePath = (specDir2, id) => `${specDir2}/evidence/${id}.json`;
 function checkEvidence({ headSpec, evidence: evidence2 }) {
   if (!evidence2?.json) return [`no AC evidence at ${evidence2?.path}`];
@@ -7515,7 +7529,59 @@ function evaluateGate({
   const humanRequired2 = [];
   const pending2 = [];
   const kind = headRef.split("/")[0];
-  const specs = changes2.filter((c) => inSpecDir(specDir2, c.path));
+  const byPath = new Map(changes2.map((c) => [c.path, c]));
+  const handled = /* @__PURE__ */ new Set();
+  const archiveIds = /* @__PURE__ */ new Set();
+  for (const c of changes2.filter((x) => isArchived(specDir2, x.path))) {
+    handled.add(c.path);
+    const id = archivedId(specDir2, c.path);
+    if (id) archiveIds.add(id);
+    else errors2.push(`${c.path}: files under ${specDir2}/archive/ must be <id>.md or evidence/<id>.json`);
+  }
+  for (const id of archiveIds) {
+    const aS = byPath.get(archivePath(specDir2, id));
+    const aE = byPath.get(archiveEvidencePath(specDir2, id));
+    const s = byPath.get(`${specDir2}/${id}.md`);
+    const e = byPath.get(evidencePath(specDir2, id));
+    for (const c of [aS, aE]) {
+      if (c?.status === "M") errors2.push(`${c.path}: archived files are immutable`);
+    }
+    for (const [a, d] of [[aS, s], [aE, e]]) {
+      if (a?.status === "A") {
+        if (kind !== "archive") errors2.push(`${a.path}: only an archive/<id> branch may add to the archive`);
+        if (d?.status === "D" && d.base === a.head) handled.add(d.path);
+      }
+    }
+    for (const c of [aS].filter((x) => x?.status === "A")) {
+      const { data, errors: errs } = validateSpec(c.head, { baseText: s?.base ?? c.head });
+      errors2.push(...errs.map((x) => `${c.path}: ${x}`));
+      if (data?.status !== "done") errors2.push(`${c.path}: only done specs may be archived (${data?.id ?? id} is ${data?.status})`);
+      if (data?.id && data.id !== id) errors2.push(`${c.path}: file name must match id (${data.id}.md)`);
+    }
+    if ([aS, aE].some((c) => c?.status === "D")) {
+      const problems = [];
+      if (kind !== "spec") problems.push("needs a spec/ branch");
+      if (aS?.status !== "D" || aE?.status !== "D") problems.push("must restore both the spec and its evidence");
+      else {
+        if (s?.status !== "A" || s.head !== aS.base) problems.push(`${s?.path ?? `${specDir2}/${id}.md`} must be added unchanged`);
+        if (e?.status !== "A" || e.head !== aE.base) problems.push(`${e?.path ?? evidencePath(specDir2, id)} must be added unchanged`);
+        if (parseSpec(aS.base ?? "").data?.status !== "done") problems.push("only a done spec can be restored");
+      }
+      if (!problems.length) {
+        const { errors: errs } = validateSpec(s.head, { baseText: aS.base });
+        problems.push(...errs);
+      }
+      if (problems.length) {
+        errors2.push(`restore of ${id}: ${problems.join("; ")}`);
+        for (const c of [aS, aE]) if (c?.status === "D") errors2.push(`${c.path}: archived files are immutable`);
+      } else {
+        handled.add(s.path);
+        handled.add(e.path);
+        humanRequired2.push(`restore of ${id} from the archive`);
+      }
+    }
+  }
+  const specs = changes2.filter((c) => inSpecDir(specDir2, c.path) && !handled.has(c.path));
   for (const c of specs) {
     if (c.status === "D") {
       const baseStatus = parseSpec(c.base ?? "").data?.status;
@@ -7531,10 +7597,10 @@ function evaluateGate({
     const stem = c.path.split("/").pop().replace(/\.md$/, "");
     if (data?.id && data.id !== stem) errors2.push(`${c.path}: file name must match id (${data.id}.md)`);
   }
-  if (specs.length) errors2.push(...validateTree(headSpecs2));
+  if (specs.length || archiveIds.size || kind === "archive") errors2.push(...validateTree(headSpecs2));
   if (kind === "idea") {
     for (const c of changes2) {
-      if (!inSpecDir(specDir2, c.path)) errors2.push(`${c.path}: idea/ branches may only touch ${specDir2}/**`);
+      if (!inSpecDir(specDir2, c.path) && !handled.has(c.path)) errors2.push(`${c.path}: idea/ branches may only touch ${specDir2}/**`);
     }
     for (const c of specs) {
       if (c.base !== void 0 && parseSpec(c.base).data?.status !== "draft") {
@@ -7547,7 +7613,7 @@ function evaluateGate({
   } else if (kind === "spec") {
     humanRequired2.push("spec/ PRs need human approval");
     for (const c of changes2) {
-      if (!inSpecDir(specDir2, c.path)) errors2.push(`${c.path}: spec/ branches may only touch ${specDir2}/**`);
+      if (!inSpecDir(specDir2, c.path) && !handled.has(c.path)) errors2.push(`${c.path}: spec/ branches may only touch ${specDir2}/**`);
     }
   } else if (kind === "build") {
     const id = headRef.slice("build/".length);
@@ -7583,6 +7649,31 @@ function evaluateGate({
         if (problems.length) pending2.push(`AC evidence: ${problems.join("; ")}`);
       }
     }
+  } else if (kind === "archive") {
+    const id = headRef.slice("archive/".length);
+    const files = [
+      ["spec", `${specDir2}/${id}.md`, archivePath(specDir2, id)],
+      ["evidence", evidencePath(specDir2, id), archiveEvidencePath(specDir2, id)]
+    ];
+    const allowed = new Set(files.flatMap(([, from, to]) => [from, to]));
+    for (const c of changes2) {
+      if (!allowed.has(c.path)) errors2.push(`${c.path}: archive/${id} may only move ${id}'s spec and evidence`);
+    }
+    for (const [what, from, to] of files) {
+      const d = byPath.get(from);
+      const a = byPath.get(to);
+      if (d?.status !== "D") errors2.push(`${from}: the active ${what} must be deleted`);
+      if (a?.status !== "A") errors2.push(`${to}: the ${what} must be added to the archive`);
+      else if (d?.status === "D" && d.base !== a.head) errors2.push(`${to}: the archived ${what} must be identical to ${from}`);
+    }
+    const moved = byPath.get(archivePath(specDir2, id));
+    if (moved?.head !== void 0) {
+      const movedId = parseSpec(moved.head).data?.id;
+      if (movedId !== id) errors2.push(`${moved.path}: the moved spec's id must be ${id} (got ${movedId})`);
+    }
+    for (const c of changes2) {
+      if (protectedRes.some((re) => re.test(c.path))) humanRequired2.push(`${c.path}: protected path`);
+    }
   }
   return { errors: errors2, humanRequired: [...new Set(humanRequired2)], pending: pending2 };
 }
@@ -7605,16 +7696,35 @@ function hasHumanApproval(reviews2, prAuthor, headSha) {
   );
 }
 
+// src/spec-tree.mjs
+import { execFileSync } from "node:child_process";
+var gitIn = (cwd) => {
+  const git2 = (...a) => execFileSync("git", a, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, cwd });
+  const show2 = (ref, p) => {
+    try {
+      return git2("show", `${ref}:${p}`);
+    } catch {
+      return void 0;
+    }
+  };
+  return { git: git2, show: show2 };
+};
+var { git, show } = gitIn(void 0);
+var specsAt = (ref, specDir2, cwd) => {
+  const { git: g, show: s } = gitIn(cwd);
+  let names = [];
+  try {
+    names = g("ls-tree", "-r", "--name-only", ref, "--", `${specDir2}/`).split("\n").filter((n) => n.endsWith(".md"));
+  } catch {
+  }
+  return names.map((path) => {
+    const { data } = parseSpec(s(ref, path) ?? "");
+    return data?.id ? { path, id: data.id, status: data.status, depends_on: data.depends_on ?? [], acceptance: data.acceptance ?? [] } : void 0;
+  }).filter(Boolean);
+};
+
 // src/gate-cli.mjs
 var env = process.env;
-var git = (...a) => execFileSync("git", a, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-var show = (ref, p) => {
-  try {
-    return git("show", `${ref}:${p}`);
-  } catch {
-    return void 0;
-  }
-};
 var cfg = existsSync(".specforge/config.yml") ? (0, import_yaml2.parse)(readFileSync(".specforge/config.yml", "utf8")) ?? {} : {};
 var specDir = cfg.spec_dir ?? "specs";
 var protectedPaths = [...DEFAULT_PROTECTED, ...cfg.protected_paths ?? []];
@@ -7628,19 +7738,8 @@ var changes = git("diff", "--name-status", "--no-renames", `${baseRef}...HEAD`).
     head: status === "D" ? void 0 : show("HEAD", path)
   };
 });
-var specsAt = (ref) => {
-  let names = [];
-  try {
-    names = git("ls-tree", "-r", "--name-only", ref, "--", `${specDir}/`).split("\n").filter((n) => n.endsWith(".md"));
-  } catch {
-  }
-  return names.map((path) => {
-    const { data } = parseSpec(show(ref, path) ?? "");
-    return data?.id ? { path, id: data.id, status: data.status, depends_on: data.depends_on ?? [], acceptance: data.acceptance ?? [] } : void 0;
-  }).filter(Boolean);
-};
-var baseSpecs = specsAt(baseRef);
-var headSpecs = specsAt("HEAD");
+var baseSpecs = specsAt(baseRef, specDir);
+var headSpecs = specsAt("HEAD", specDir);
 var evidence;
 if (env.HEAD_REF.startsWith("build/")) {
   const path = evidencePath(specDir, env.HEAD_REF.slice("build/".length));

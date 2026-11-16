@@ -1,16 +1,11 @@
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { parse } from 'yaml';
 import { evaluateGate, hasHumanApproval, gateState, reviewersToRerequest, evidencePath, DEFAULT_PROTECTED } from './gate.mjs';
-import { parseSpec } from './spec.mjs';
+import { git, show, specsAt } from './spec-tree.mjs';
 
 // Reports the required commit status `specforge/gate` on the PR head commit.
 // Env (set by the reusable workflow): HEAD_REF, BASE_REF, PR_AUTHOR, PR_HEAD_SHA, PR_NUMBER, GH_TOKEN, GITHUB_REPOSITORY
 const env = process.env;
-const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-const show = (ref, p) => {
-  try { return git('show', `${ref}:${p}`); } catch { return undefined; }
-};
 
 const cfg = existsSync('.specforge/config.yml') ? parse(readFileSync('.specforge/config.yml', 'utf8')) ?? {} : {};
 const specDir = cfg.spec_dir ?? 'specs';
@@ -27,17 +22,8 @@ const changes = git('diff', '--name-status', '--no-renames', `${baseRef}...HEAD`
     };
   });
 
-// Every spec at a ref, reduced to what the dependency and evidence rules need.
-const specsAt = (ref) => {
-  let names = [];
-  try { names = git('ls-tree', '-r', '--name-only', ref, '--', `${specDir}/`).split('\n').filter((n) => n.endsWith('.md')); } catch { /* no spec dir yet */ }
-  return names.map((path) => {
-    const { data } = parseSpec(show(ref, path) ?? '');
-    return data?.id ? { path, id: data.id, status: data.status, depends_on: data.depends_on ?? [], acceptance: data.acceptance ?? [] } : undefined;
-  }).filter(Boolean);
-};
-const baseSpecs = specsAt(baseRef);
-const headSpecs = specsAt('HEAD');
+const baseSpecs = specsAt(baseRef, specDir);
+const headSpecs = specsAt('HEAD', specDir);
 
 // For a build/ PR: the committed AC evidence, and whether it still describes what ships.
 let evidence;
