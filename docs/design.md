@@ -13,4 +13,4 @@ Lifecycle: `idea/` (auto-merged draft spec) -> `spec/` (human-approved) -> `buil
 
 `dist/` is committed (bundled with esbuild) so repos need no install step. Run `npm run build` after changing `src/`; CI fails if dist is stale.
 
-- **Blind review** means independent, not isolated: reviewers are not the spec's author and get no author context, but they read the codebase, because spec accuracy can't be judged without it.
+- **Independent review**: reviewers are never the agent that wrote the spec and get no author context, but they read the codebase, because spec accuracy can't be judged without it.
