@@ -142,3 +142,19 @@ test('decideMerge ignores the merge job itself so it does not wait on its own ch
   assert.equal(decideMerge([gate, self]).state, 'wait');
   assert.equal(decideMerge([gate, self], { ignoreJob: 'merge' }).state, 'merge');
 });
+
+import { resolveReviewers, codeownersFor } from '../src/reviewers.mjs';
+
+test('reviewers: config wins, author never requested, teams split out', () => {
+  assert.deepEqual(resolveReviewers({ configReviewers: ['zach', 'org/leads'], codeowners: '* @other', specPath: 'specs/a.md', author: 'app[bot]' }), { users: ['zach'], teams: ['leads'] });
+  assert.deepEqual(resolveReviewers({ configReviewers: ['@Tavrick'], specPath: 'specs/a.md', author: 'tavrick[bot]' }), { users: [], teams: [] });
+});
+
+test('reviewers: falls back to CODEOWNERS, last matching line wins', () => {
+  const co = '# owners\n* @everyone\n/specs/ @spec-owner\ndocs/ @doc-owner\n*.md @md-owner\n';
+  assert.deepEqual(codeownersFor(co, 'specs/a.md'), ['@md-owner']); // *.md is last and matches
+  assert.deepEqual(codeownersFor('* @a\n/specs/ @b\n', 'specs/a.md'), ['@b']);
+  assert.deepEqual(codeownersFor('* @a\n', 'src/x.js'), ['@a']);
+  assert.deepEqual(resolveReviewers({ codeowners: '* @a\n/specs/ @b someone@example.com\n', specPath: 'specs/x.md', author: 'bot' }), { users: ['b'], teams: [] });
+  assert.deepEqual(resolveReviewers({ specPath: 'specs/x.md', author: 'bot' }), { users: [], teams: [] });
+});
