@@ -24,13 +24,15 @@ if (!token) {
   process.exit(2);
 }
 
-const run = (cmd, a, opts = {}) => execFileSync(cmd, a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
-const asApp = ['-c', 'credential.helper=', '-c', `credential.helper=!f() { echo username=x-access-token; echo password=${token}; }; f`];
+const run = (cmd, a, opts = {}) => execFileSync(cmd, a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 300_000, ...opts });
+// The helper reads the token from the environment, so it is never in argv or an error message.
+const asApp = ['-c', 'credential.helper=', '-c', 'credential.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN; }; f'];
+const firstLine = (e) => String(e.stderr || e.message).split('\n')[0].replaceAll(token, '***');
 
 try {
   git(...asApp, 'fetch', 'origin', branch);
 } catch (e) {
-  console.error(`archive: could not fetch origin ${branch} as the app, stopping: ${String(e.stderr || e.message).split('\n')[0]}`);
+  console.error(`archive: could not fetch origin ${branch} as the app, stopping: ${firstLine(e)}`);
   process.exit(1);
 }
 
@@ -45,7 +47,7 @@ try {
   for (const r of refs.split('\n')) if (r.startsWith('archive/')) prior.add(r.slice('archive/'.length));
   for (const l of git('ls-remote', '--heads', 'origin', 'archive/*').split('\n').filter(Boolean)) prior.add(l.split('refs/heads/archive/')[1]);
 } catch (e) {
-  console.error(`archive: could not read the PR history, stopping: ${String(e.stderr || e.message).split('\n')[0]}`);
+  console.error(`archive: could not read the PR history, stopping: ${firstLine(e)}`);
   process.exit(1);
 }
 
@@ -57,22 +59,29 @@ for (const s of skipped) console.log(`  - ${s.id}: ${s.reason}`);
 
 if (apply) {
   for (const { id, path } of moves) {
+    let step = 'creating the worktree';
+    let cwd;
     try {
       const title = parseSpec(show(ref, path) ?? '').data?.title ?? id;
       const created = JSON.parse(run('orca', ['worktree', 'create', '--name', `archive-${id}`, '--no-parent', '--base-branch', ref, '--branch', `archive/${id}`, '--json'])).result;
-      const cwd = created.worktree?.path ?? created.path;
+      cwd = created.worktree?.path ?? created.path;
       const g = (...a) => run('git', a, { cwd });
+      step = 'moving the files';
       mkdirSync(`${cwd}/${specDir}/archive/evidence`, { recursive: true });
       g('mv', '--', path, archivePath(specDir, id));
       g('mv', evidencePath(specDir, id), archiveEvidencePath(specDir, id));
+      step = 'committing';
       g('commit', '-m', `Archive ${id}\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`);
+      step = 'pushing';
       run('git', [...asApp, 'push', '-u', 'origin', `archive/${id}`], { cwd });
+      step = 'opening the PR';
       const url = run('gh', ['pr', 'create', '--base', branch, '--head', `archive/${id}`, '--title', `archive: ${title}`,
         '--body', `Moves the done spec \`${id}\` and its evidence into \`${specDir}/archive/\`, content unchanged.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)`], { cwd, env: process.env }).trim();
+      step = 'enabling auto-merge';
       run('gh', ['pr', 'merge', url, '--squash', '--auto'], { cwd, env: process.env });
       console.log(`opened ${url}`);
     } catch (e) {
-      console.error(`archive: ${id} failed, stopping: ${String(e.stderr || e.message).split('\n')[0]}`);
+      console.error(`archive: ${id} failed while ${step}, stopping: ${firstLine(e)}${cwd ? ` (worktree ${cwd}, branch archive/${id}; clean up by hand, a rerun will skip ${id})` : ''}`);
       process.exit(1);
     }
   }

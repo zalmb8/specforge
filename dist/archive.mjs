@@ -7396,7 +7396,8 @@ function planArchive({ archive, specs: specs2 = [], evidenceIds: evidenceIds2 = 
   const prior2 = new Set(priorArchiveIds);
   for (const s of specs2) {
     if (s.status !== "done" || isArchived(specDir2, s.path)) continue;
-    if (prior2.has(s.id)) skipped2.push({ id: s.id, reason: `a prior archive/${s.id} PR exists; reopen it by hand` });
+    if (s.path.split("/").pop() !== `${s.id}.md`) skipped2.push({ id: s.id, reason: `file name does not match id (${s.path})` });
+    else if (prior2.has(s.id)) skipped2.push({ id: s.id, reason: `a prior archive/${s.id} PR exists; reopen it by hand` });
     else if (!evidence.has(s.id)) skipped2.push({ id: s.id, reason: "no evidence file" });
     else moves2.push({ id: s.id, path: s.path });
   }
@@ -7444,12 +7445,13 @@ if (!token) {
   console.error("archive: GH_TOKEN is not set; mint the app token first (node <plugin>/dist/mint-app-token.mjs)");
   process.exit(2);
 }
-var run = (cmd, a, opts = {}) => execFileSync2(cmd, a, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...opts });
-var asApp = ["-c", "credential.helper=", "-c", `credential.helper=!f() { echo username=x-access-token; echo password=${token}; }; f`];
+var run = (cmd, a, opts = {}) => execFileSync2(cmd, a, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 3e5, ...opts });
+var asApp = ["-c", "credential.helper=", "-c", "credential.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN; }; f"];
+var firstLine = (e) => String(e.stderr || e.message).split("\n")[0].replaceAll(token, "***");
 try {
   git(...asApp, "fetch", "origin", branch);
 } catch (e) {
-  console.error(`archive: could not fetch origin ${branch} as the app, stopping: ${String(e.stderr || e.message).split("\n")[0]}`);
+  console.error(`archive: could not fetch origin ${branch} as the app, stopping: ${firstLine(e)}`);
   process.exit(1);
 }
 var ref = `origin/${branch}`;
@@ -7461,7 +7463,7 @@ try {
   for (const r of refs.split("\n")) if (r.startsWith("archive/")) prior.add(r.slice("archive/".length));
   for (const l of git("ls-remote", "--heads", "origin", "archive/*").split("\n").filter(Boolean)) prior.add(l.split("refs/heads/archive/")[1]);
 } catch (e) {
-  console.error(`archive: could not read the PR history, stopping: ${String(e.stderr || e.message).split("\n")[0]}`);
+  console.error(`archive: could not read the PR history, stopping: ${firstLine(e)}`);
   process.exit(1);
 }
 var { moves, skipped } = planArchive({ archive: true, specs, evidenceIds, priorArchiveIds: [...prior], specDir });
@@ -7471,18 +7473,24 @@ console.log(`skipped ${skipped.length}:`);
 for (const s of skipped) console.log(`  - ${s.id}: ${s.reason}`);
 if (apply) {
   for (const { id, path } of moves) {
+    let step = "creating the worktree";
+    let cwd;
     try {
       const title = parseSpec(show(ref, path) ?? "").data?.title ?? id;
       const created = JSON.parse(run("orca", ["worktree", "create", "--name", `archive-${id}`, "--no-parent", "--base-branch", ref, "--branch", `archive/${id}`, "--json"])).result;
-      const cwd = created.worktree?.path ?? created.path;
+      cwd = created.worktree?.path ?? created.path;
       const g = (...a) => run("git", a, { cwd });
+      step = "moving the files";
       mkdirSync(`${cwd}/${specDir}/archive/evidence`, { recursive: true });
       g("mv", "--", path, archivePath(specDir, id));
       g("mv", evidencePath(specDir, id), archiveEvidencePath(specDir, id));
+      step = "committing";
       g("commit", "-m", `Archive ${id}
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`);
+      step = "pushing";
       run("git", [...asApp, "push", "-u", "origin", `archive/${id}`], { cwd });
+      step = "opening the PR";
       const url = run("gh", [
         "pr",
         "create",
@@ -7497,10 +7505,11 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`);
 
 \u{1F916} Generated with [Claude Code](https://claude.com/claude-code)`
       ], { cwd, env: process.env }).trim();
+      step = "enabling auto-merge";
       run("gh", ["pr", "merge", url, "--squash", "--auto"], { cwd, env: process.env });
       console.log(`opened ${url}`);
     } catch (e) {
-      console.error(`archive: ${id} failed, stopping: ${String(e.stderr || e.message).split("\n")[0]}`);
+      console.error(`archive: ${id} failed while ${step}, stopping: ${firstLine(e)}${cwd ? ` (worktree ${cwd}, branch archive/${id}; clean up by hand, a rerun will skip ${id})` : ""}`);
       process.exit(1);
     }
   }

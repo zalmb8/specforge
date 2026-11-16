@@ -4,6 +4,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validateTree } from '../src/spec.mjs';
 import { evaluateGate, gateState, evidencePath, archivePath, archiveEvidencePath } from '../src/gate.mjs';
 import { specsAt } from '../src/spec-tree.mjs';
@@ -84,15 +85,15 @@ test('archive: the evidence must move byte-identical with the spec', (t) => {
   const id = 'retry-queue';
   const errs = (changes) => gate(`archive/${id}`, changes, { headSpecs: [sp(id)] }).errors.join('\n');
   t.test('evidence not added at the archive path', () => {
-    assert.match(errs(move().filter((c) => c.path !== archiveEvidencePath(D, id))), /evidence/);
+    assert.match(errs(move().filter((c) => c.path !== archiveEvidencePath(D, id))), /the evidence must be added to the archive/);
   });
   t.test('evidence content differs', () => {
     const c = move();
     c[3] = ch(archiveEvidencePath(D, id), 'A', undefined, ev(id) + ' ');
-    assert.match(errs(c), /evidence.*identical|identical.*evidence/s);
+    assert.match(errs(c), /the archived evidence must be identical/);
   });
   t.test('active evidence not deleted', () => {
-    assert.match(errs(move().filter((c) => c.path !== evidencePath(D, id))), /evidence/);
+    assert.match(errs(move().filter((c) => c.path !== evidencePath(D, id))), /the active evidence must be deleted/);
   });
 });
 
@@ -103,10 +104,14 @@ test('archive: a move leaves referrers valid and unchanged', () => {
   assert.deepEqual(r.errors, []);
 });
 
-test('archive: only done specs may be archived', () => {
+test('archive: only done specs may be archived', (t) => {
   const text = spec({ status: 'approved' });
-  const r = gate('archive/retry-queue', move('retry-queue', { text }));
-  assert.match(r.errors.join(), /retry-queue.*done|only done specs/);
+  for (const kind of ['archive', 'idea', 'spec', 'build']) {
+    t.test(kind, () => {
+      const r = gate(`${kind}/retry-queue`, move('retry-queue', { text }));
+      assert.match(r.errors.join('\n'), /only done specs may be archived \(retry-queue is approved\)/);
+    });
+  }
 });
 
 test('archive: a clean move passes with no human', () => {
@@ -120,7 +125,8 @@ test('archive: deleting a done spec without moving it fails', (t) => {
     t.test(kind, () => {
       const id = kind === 'archive' || kind === 'build' ? 'retry-queue' : 'x';
       const r = gate(`${kind}/${id}`, [ch(`${D}/retry-queue.md`, 'D', spec(), undefined)]);
-      assert.ok(r.errors.length > 0);
+      assert.match(r.errors.join('\n'), /a spec that is done cannot be deleted or renamed/);
+      if (kind === 'archive') assert.match(r.errors.join('\n'), /must be added to the archive/);
     });
   }
 });
@@ -228,6 +234,15 @@ test('archive: archived files are immutable', (t) => {
   }
 });
 
+test('archive: archived files are immutable when deleted alone', (t) => {
+  for (const kind of ['archive', 'idea', 'spec', 'build']) {
+    t.test(`${kind} deletes one archived file`, () => {
+      const r = gate(`${kind}/retry-queue`, [ch(archivePath(D, 'retry-queue'), 'D', spec(), undefined)]);
+      assert.match(r.errors.join('\n'), /immutable/);
+    });
+  }
+});
+
 test('archive: restore needs a spec branch and a human', (t) => {
   const id = 'retry-queue';
   t.test('spec/ restore is allowed and needs a human', () => {
@@ -237,26 +252,30 @@ test('archive: restore needs a spec branch and a human', (t) => {
   });
   for (const kind of ['idea', 'build', 'archive']) {
     t.test(`${kind}/ restore is an error`, () => {
-      assert.ok(gate(`${kind}/${id}`, restore(), { headSpecs: [sp(id)] }).errors.length > 0);
+      assert.match(gate(`${kind}/${id}`, restore(), { headSpecs: [sp(id)] }).errors.join('\n'), /restore of retry-queue: needs a spec\/ branch/);
     });
   }
   t.test('restore with changed content is an error', () => {
     const c = restore();
     c[2] = ch(`${D}/${id}.md`, 'A', undefined, spec({ extra: ' changed' }));
-    assert.ok(gate(`spec/${id}`, c, { headSpecs: [sp(id)] }).errors.length > 0);
+    assert.match(gate(`spec/${id}`, c, { headSpecs: [sp(id)] }).errors.join('\n'), /restore of retry-queue: .*must be added unchanged/);
   });
   t.test('restore with changed evidence is an error', () => {
     const c = restore();
     c[3] = ch(evidencePath(D, id), 'A', undefined, ev(id) + ' ');
-    assert.ok(gate(`spec/${id}`, c, { headSpecs: [sp(id)] }).errors.length > 0);
+    assert.match(gate(`spec/${id}`, c, { headSpecs: [sp(id)] }).errors.join('\n'), /restore of retry-queue: .*must be added unchanged/);
   });
   t.test('restoring only the spec is an error', () => {
     const c = restore().filter((x) => !x.path.endsWith('.json'));
-    assert.ok(gate(`spec/${id}`, c, { headSpecs: [sp(id)] }).errors.length > 0);
+    assert.match(gate(`spec/${id}`, c, { headSpecs: [sp(id)] }).errors.join('\n'), /must restore both the spec and its evidence/);
   });
   t.test('restoring only the evidence is an error', () => {
     const c = restore().filter((x) => x.path.endsWith('.json'));
-    assert.ok(gate(`spec/${id}`, c, { headSpecs: [sp(id)] }).errors.length > 0);
+    assert.match(gate(`spec/${id}`, c, { headSpecs: [sp(id)] }).errors.join('\n'), /must restore both the spec and its evidence/);
+  });
+  t.test('restoring a spec that is not done is an error', () => {
+    const r = gate(`spec/${id}`, restore(id, { text: spec({ status: 'approved' }) }), { headSpecs: [sp(id, 'approved')] });
+    assert.match(r.errors.join('\n'), /only a done spec can be restored/);
   });
 });
 
@@ -268,11 +287,11 @@ test('archive: an archive PR moves exactly its own spec', (t) => {
   });
   t.test("another spec's move", () => {
     const r = gate(`archive/${id}`, [...move(), ...move('other')], { headSpecs: [sp(id), sp('other')] });
-    assert.ok(r.errors.length > 0);
+    assert.match(r.errors.join('\n'), /may only move/);
   });
   t.test('spec id differs from the branch id', () => {
     const r = gate('archive/other', move('other', { text: spec({ id: 'retry-queue' }) }));
-    assert.ok(r.errors.length > 0);
+    assert.match(r.errors.join('\n'), /the moved spec's id must be other/);
   });
   t.test('a protected path needs a human', () => {
     const r = gate(`archive/${id}`, move(), { headSpecs: [sp(id)], protectedPaths: ['^specs/archive/'] });
@@ -283,16 +302,25 @@ test('archive: an archive PR moves exactly its own spec', (t) => {
 
 test('archive: the command does nothing unless archive is true', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sf-cmd-'));
+  const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' });
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@example.com');
+  g('config', 'user.name', 't');
   mkdirSync(join(dir, '.specforge'));
   writeFileSync(join(dir, '.specforge/config.yml'), 'specforge: 1\nspec_dir: specs\ndefault_branch: main\n');
-  const bundle = join(process.cwd(), 'dist/archive.mjs');
+  g('add', '-A');
+  g('commit', '-qm', 'x');
+  const branches = g('branch', '--list');
+  const worktrees = g('worktree', 'list');
+  const bundle = fileURLToPath(new URL('../dist/archive.mjs', import.meta.url));
   const r = spawnSync('node', [bundle, '--apply'], { cwd: dir, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: dir } });
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /not enabled/i);
-  assert.equal(spawnSync('git', ['status'], { cwd: dir, encoding: 'utf8' }).status !== 0, true, 'no repo, so nothing was created');
+  assert.equal(g('branch', '--list'), branches);
+  assert.equal(g('worktree', 'list'), worktrees);
 });
 
 test('archive: validateTree rejects a duplicate id across active and archived', () => {
   const errs = validateTree([sp('dup', 'done'), sp('dup', 'done')]);
-  assert.match(errs.join(), /dup/);
+  assert.match(errs.join(), /duplicate spec id "dup"/);
 });

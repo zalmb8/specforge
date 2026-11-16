@@ -21,4 +21,4 @@ description: Adopt specforge in the current repo: add .specforge/config.yml, the
 8. Optional: schedule the sweep in Orca, e.g.
    `orca automations create --name specforge-sweep --trigger daily --time 07:00 --provider claude --repo path:<repo> --prompt "Run the specforge sweep skill with --apply and report stuck ideas."`
 
-`init --upgrade` also tells the user about the opt-in `archive: true` config key (done specs move to `<spec_dir>/archive/` via `dist/archive.mjs`) and adds `archive: false` to the config if the key is missing. It compares `.specforge/config.yml`'s `specforge:` version and the workflow's `@v` tag with the plugin's, and migrates or reports.
+On `init --upgrade`, if `archive` is absent from `.specforge/config.yml`, add the `archive: false` line from `templates/config.yml` and tell the user it is opt-in (done specs move to `<spec_dir>/archive/` via `dist/archive.mjs`). `init --upgrade` also compares `.specforge/config.yml`'s `specforge:` version and the workflow's `@v` tag with the plugin's, and migrates or reports.
