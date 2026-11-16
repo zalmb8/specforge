@@ -5,7 +5,7 @@ default_branch: main
 protected_paths: []          # extra regexes that always need a human, e.g. ^migrations/
 commands:
   test: npm test
-  lint: npm run lint
+  lint: ""                   # leave empty if the repo has no lint script
 loops:
   spec_review_max: 3
   ci_fix_max: 5
