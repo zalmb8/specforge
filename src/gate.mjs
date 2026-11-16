@@ -27,8 +27,10 @@ export function evaluateGate({ headRef, changes, specDir = 'specs', protectedPat
       errors.push(`${c.path}: specs must not be deleted by a PR`);
       continue;
     }
-    const { errors: errs } = validateSpec(c.head, { baseText: c.base });
+    const { errors: errs, data } = validateSpec(c.head, { baseText: c.base });
     errors.push(...errs.map((e) => `${c.path}: ${e}`));
+    const stem = c.path.split('/').pop().replace(/\.md$/, '');
+    if (data?.id && data.id !== stem) errors.push(`${c.path}: file name must match id (${data.id}.md)`);
   }
 
   if (kind === 'idea') {

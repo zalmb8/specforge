@@ -49,7 +49,7 @@ test('openQuestions counts only unchecked items in the section', () => {
 const change = (path, status, base, head) => ({ path, status, base, head });
 
 test('idea/ may only add draft specs under specs/', () => {
-  const ok = evaluateGate({ headRef: 'idea/x', changes: [change('specs/x.md', 'A', undefined, spec({ id: 'x' }))] });
+  const ok = evaluateGate({ headRef: 'idea/x', changes: [change('specs/retry-queue.md', 'A', undefined, spec())] });
   assert.deepEqual([ok.errors, ok.humanRequired], [[], []]);
   const bad = evaluateGate({ headRef: 'idea/x', changes: [change('src/app.js', 'M', 'a', 'b')] });
   assert.match(bad.errors.join(), /may only touch/);
@@ -58,13 +58,13 @@ test('idea/ may only add draft specs under specs/', () => {
 test('idea/ cannot modify an approved spec', () => {
   const r = evaluateGate({
     headRef: 'idea/x',
-    changes: [change('specs/x.md', 'M', spec({ status: 'approved', acs: AC }), spec({ acs: AC }))],
+    changes: [change('specs/retry-queue.md', 'M', spec({ status: 'approved', acs: AC }), spec({ acs: AC }))],
   });
   assert.match(r.errors.join(), /non-draft/);
 });
 
 test('spec/ always needs a human', () => {
-  const r = evaluateGate({ headRef: 'spec/x', changes: [change('specs/x.md', 'M', spec({ status: 'refining' }), spec({ status: 'refining' }))] });
+  const r = evaluateGate({ headRef: 'spec/x', changes: [change('specs/retry-queue.md', 'M', spec({ status: 'refining' }), spec({ status: 'refining' }))] });
   assert.equal(r.humanRequired.length, 1);
 });
 
@@ -73,7 +73,7 @@ test('build/ escalates on AC change and protected paths', () => {
   const changedAc = spec({ status: 'implementing', acs: AC.replace('backs off', 'backs off slowly') });
   const r = evaluateGate({
     headRef: 'build/x',
-    changes: [change('specs/x.md', 'M', base, changedAc), change('.github/workflows/ci.yml', 'M', 'a', 'b')],
+    changes: [change('specs/retry-queue.md', 'M', base, changedAc), change('.github/workflows/ci.yml', 'M', 'a', 'b')],
   });
   assert.equal(r.errors.length, 0);
   assert.equal(r.humanRequired.length, 2);
@@ -81,9 +81,9 @@ test('build/ escalates on AC change and protected paths', () => {
 
 test('build/ status-only change is autonomous; build of a draft is rejected', () => {
   const base = spec({ status: 'approved', acs: AC });
-  const ok = evaluateGate({ headRef: 'build/x', changes: [change('specs/x.md', 'M', base, spec({ status: 'implementing', acs: AC }))] });
+  const ok = evaluateGate({ headRef: 'build/x', changes: [change('specs/retry-queue.md', 'M', base, spec({ status: 'implementing', acs: AC }))] });
   assert.deepEqual([ok.errors, ok.humanRequired], [[], []]);
-  const bad = evaluateGate({ headRef: 'build/x', changes: [change('specs/x.md', 'M', spec(), spec())] });
+  const bad = evaluateGate({ headRef: 'build/x', changes: [change('specs/retry-queue.md', 'M', spec(), spec())] });
   assert.match(bad.errors.join(), /approved or implementing/);
 });
 
@@ -104,4 +104,9 @@ test('decideMerge waits for the gate, refuses on red, merges when all green', ()
   assert.equal(decideMerge([gate({ conclusion: 'failure' })]).state, 'refuse');
   assert.equal(decideMerge([gate(), { name: 'test', status: 'completed', conclusion: 'failure' }]).state, 'refuse');
   assert.equal(decideMerge([gate(), { name: 'test', status: 'completed', conclusion: 'success' }]).state, 'merge');
+});
+
+test('spec file name must match its id', () => {
+  const r = evaluateGate({ headRef: 'idea/x', changes: [change('specs/other-name.md', 'A', undefined, spec())] });
+  assert.match(r.errors.join(), /file name must match id/);
 });

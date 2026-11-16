@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { validateSpec } from './spec.mjs';
 
@@ -17,7 +18,9 @@ for (const file of args) {
       baseText = undefined; // new file
     }
   }
-  const { errors } = validateSpec(readFileSync(file, 'utf8'), { baseText });
+  const { errors, data } = validateSpec(readFileSync(file, 'utf8'), { baseText });
+  const stem = basename(file).replace(/\.md$/, '');
+  if (data?.id && data.id !== stem) errors.push(`file name must match id (${data.id}.md)`);
   if (errors.length) {
     failed = true;
     console.error(`FAIL ${file}\n${errors.map((e) => `  - ${e}`).join('\n')}`);
