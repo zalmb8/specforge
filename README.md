@@ -38,7 +38,7 @@ Do this once per machine. Everything here assumes macOS (the App key lives in th
 
 - **A public repo, or a paid plan** (GitHub Pro/Team) for private repos. Specforge relies on branch protection, auto-merge and CODEOWNERS. See [Private repos on free plans](#private-repos-on-free-plans).
 - **Orca**, with the `orca` CLI on your `PATH` (`orca status` should work). Each flow creates a worktree and an agent through it.
-- **`gh`** authenticated with the `workflow` scope (`gh auth refresh -s workflow`), **Node 22+**, and **Claude Code**.
+- **`gh`** authenticated with the `workflow` scope (`gh auth refresh -s workflow`), **Node 26** (the current LTS, which CI and the gate run on), and **Claude Code**.
 
 ### 2. Create a GitHub App
 

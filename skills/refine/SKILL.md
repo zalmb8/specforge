@@ -39,7 +39,7 @@ You are the kickoff session. The refinement itself happens in its own Orca works
 >
 > **2b. Dependencies.** Decide `depends_on` with the user: list the id of every spec this one needs built first, and nothing else. Check each id exists under `<spec_dir>/`. A spec that is built on top of unfinished work cannot be built until its dependencies are `done`, so ask when the prose names a prerequisite.
 >
-> **3. Make it verifiable.** Replace every `verify: TBD` with a concrete target: a test path and name, or a command with an expected result. Ask the user where a target is a real choice.
+> **3. Make it verifiable.** Replace every `verify: TBD` with a concrete target: a test path and name, or a command with an expected result. A target must isolate its criterion: running it executes only that test or check, and it fails if the test does not exist. Run the command yourself against the code when you can, and confirm only the named test runs. Ask the user where a target is a real choice.
 >
 > **4. Independent review loop**, at most `loops.spec_review_max` rounds. Each round:
 > - Spawn one `spec-reviewer` agent per lens, in parallel. The lenses are every file in `PLUGIN/lenses/spec/` plus any extra names in `review_lenses` (read from `.specforge/lenses/spec/<name>.md`; a repo file with a built-in's name replaces it; drop names listed in `exclude_lenses`; no duplicates). Each reviewer gets the path to the spec and the full text of exactly one lens. Pass no reasoning, no history, no summary of the conversation.

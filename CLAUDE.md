@@ -6,7 +6,7 @@ A Claude Code plugin (and its own marketplace) that drives idea -> draft spec ->
 
 - `npm test` runs unit tests and the real `dist/` bundles. `npm run build` bundles `src/` into `dist/` with esbuild.
 - `dist/` is committed so adopting repos need no install step. After any `src/` change run `npm run build` and commit `dist/`; CI fails if it is stale.
-- Node 22 is what CI runs. Local Node is newer, so a green local run proves less than it looks; do not assume it.
+- CI (`ci.yml`) and the reusable gate (`gate.yml`) pin Node 26, the current LTS, so local and CI match. When the LTS moves, change both pins in one PR and check nodejs.org first; do not use `lts/*`, which would change CI silently.
 
 ## How to change things
 
