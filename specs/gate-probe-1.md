@@ -2,12 +2,12 @@
 specforge: 1
 id: gate-probe-1
 title: Probe gate-probe-1
-status: draft
+status: approved
 depends_on: []        # ids of specs that must be done before this one can be built
 acceptance:
   - id: AC-1
     text: Probe
-    verify: TBD   # required once approved: a command or test that runs ONLY this criterion's check and fails if it is missing
+    verify: npm test
 ---
 
 ## Summary
