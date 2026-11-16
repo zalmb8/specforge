@@ -28,7 +28,12 @@ for (const w of candidates) {
     if (pr.state === 'OPEN') { stuck.push(`${label}: PR open ${pr.url}`); continue; }
     if (pr.state === 'CLOSED') { stuck.push(`${label}: PR closed unmerged ${pr.url}`); continue; }
     const head = run('git', ['rev-parse', 'HEAD'], { cwd: w.path }).trim();
-    if (head !== pr.headRefOid) { stuck.push(`${label}: local commits differ from merged PR ${pr.url}`); continue; }
+    if (head !== pr.headRefOid) {
+      // The PR head may have moved on the server (update-branch, a merge from main). That is fine as
+      // long as our commit is contained in it; anything else is local work that never shipped.
+      const cmp = JSON.parse(run('gh', ['api', `repos/{owner}/{repo}/compare/${head}...${pr.headRefOid}`], { cwd: w.path }));
+      if (!['ahead', 'identical'].includes(cmp.status)) { stuck.push(`${label}: local commits not in merged PR ${pr.url}`); continue; }
+    }
     if (run('git', ['status', '--porcelain'], { cwd: w.path }).trim()) { stuck.push(`${label}: uncommitted changes`); continue; }
     if (apply) {
       // The remote branch is deleted by GitHub ("automatically delete head branches"), which init enables.
