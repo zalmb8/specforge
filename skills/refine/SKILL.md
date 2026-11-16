@@ -1,8 +1,58 @@
 ---
 name: refine
-description: Refine a draft spec into an approved one on a spec/ branch, then open a PR for human approval. Manual kickoff. (Not implemented yet.)
+description: Refine a draft spec into an approved one on a spec/ branch, answering open questions with the user, running independent reviews, and opening a PR for human approval. Manual kickoff, e.g. "/specforge:refine todo-json-export". Use when the user wants to refine, finalize or approve a spec.
 ---
 
-# specforge refine (iteration 2)
+# specforge refine
 
-Planned: worktree on `spec/<id>` -> answer open questions with the user -> independent review loop (fix valid, push back on bad, ask the user on questionable; capped by `loops.spec_review_max`) -> status `approved` -> PR. The gate holds the PR until a human approves.
+You are the kickoff session. The refinement itself happens in its own Orca workspace, in an agent the user talks to there. You prepare it, launch it, report, and stop. `PLUGIN` means `${CLAUDE_PLUGIN_ROOT}`; write its literal value into the brief, because the worker has no such variable.
+
+## Kickoff
+
+1. **Resolve the spec id.** The argument is the full slug (`todo-json-export`); accept a unique prefix. With no argument or an ambiguous one, list the specs on `origin/main` whose status is `draft` and ask the user to pick. Only `draft` or `approved` specs can be refined; refuse `implementing` and `done`.
+2. **Sweep** finished worktrees first: `node PLUGIN/dist/sweep.mjs --apply`
+3. **Fetch with the app token**; if the fetch fails, stop and tell the user, never fall back to a cached ref:
+   ```text
+   export GH_TOKEN=$(node PLUGIN/dist/mint-app-token.mjs)
+   git -c credential.helper= -c "credential.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN; }; f" fetch origin main
+   ```
+4. **Resume if possible.** If a worktree on `spec/<id>` already exists (`orca worktree list --json`), tell the user where it is and stop; do not create a second one.
+5. **Create the worktree with no agent yet**, write the brief into it, then launch:
+   ```text
+   orca worktree create --name refine-<id> --no-parent --base-branch origin/main --branch spec/<id> --json
+   ```
+   Write the brief (below) to `<worktree path>/.specforge/brief.md` (gitignored). Then:
+   ```text
+   orca agent launch --agent claude --worktree id:<worktree id> \
+     --prompt "Read .specforge/brief.md and follow it exactly." --json
+   ```
+   Require `result.launch.prompt.outcome` to be `journaled` or `handed-to-terminal`; if the prompt was not delivered, the agent is idle, so say so instead of reporting success.
+6. **Report** the worktree and branch, tell the user to continue in that workspace, and stop. Do not do the refinement yourself.
+
+## Brief
+
+> You are the specforge refine agent for spec `<id>` in `<owner/repo>`, on branch `spec/<id>`. PLUGIN=`<literal plugin path>`; use it exactly as written. You work interactively with the user in this session. Touch only `<spec_dir>/<id>.md`. Do not invent answers to open questions, and never decide a question that is the user's to decide.
+>
+> **1. Read** the spec, `.specforge/config.yml`, and enough of the codebase to discuss the spec accurately. Commit nothing yet.
+>
+> **2. Answer open questions.** Take the unchecked items under "Open questions" and put them to the user with AskUserQuestion, grouped so each round is a handful of related questions, with your recommendation first where you have one. For each answer: tick the item (`- [x]`), add the answer to it, and **change the Design and acceptance criteria to reflect it**. A ticked question with an unchanged spec is a defect. New questions that arise go in as new `- [ ]` items and are asked too. Continue until none are unchecked.
+>
+> **3. Make it verifiable.** Replace every `verify: TBD` with a concrete target: a test path and name, or a command with an expected result. Ask the user where a target is a real choice.
+>
+> **4. Independent review loop**, at most `loops.spec_review_max` rounds. Each round:
+> - Spawn one `spec-reviewer` agent per lens in `review_lenses`, in parallel. Each gets the path to the spec and the full text of exactly one lens, read from `.specforge/lenses/<name>.md` if it exists, else `PLUGIN/lenses/<name>.md`. Pass no reasoning, no history, no summary of the conversation.
+> - Triage every finding yourself, and record the verdict:
+>   - **Valid**: fix it in the spec.
+>   - **Wrong**: push back. Write one line saying why, citing the code or the spec; it goes in the PR description.
+>   - **Questionable** (a real judgment call, a tradeoff, or it touches a decision the user made): ask the user, with your recommendation.
+> - If a fix changed the spec materially, run another round, otherwise stop. When the cap is reached with findings outstanding, list them for the user rather than looping on.
+>
+> **5. Acceptance.** Show the user the final spec in summary: what it will build, the acceptance criteria with their verify targets, what was pushed back on and why. Ask whether to approve it. Do not proceed without an explicit yes. If they want changes, make them and re-run only the review rounds still within the cap.
+>
+> **6. Approve and open the PR.** Set `status: approved`. Run `node PLUGIN/dist/validate-cli.mjs <spec_dir>/<id>.md --base origin/main` and fix until it passes (if the tool itself crashes, stop and report). Commit with the trailer `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Act as the GitHub App: `export GH_TOKEN=$(node PLUGIN/dist/mint-app-token.mjs)`; push with
+> `git -c credential.helper= -c "credential.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN; }; f" push -u origin spec/<id>`;
+> open a PR titled `spec: <title>` whose body has the summary, the acceptance criteria, and the pushed-back findings with reasons, ending with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+>
+> **7. Wait for the human.** Tell the user the PR is ready for their review and give the URL. The `specforge/gate` check stays red until a human who is not the PR author approves it; that is by design. Then run `node PLUGIN/dist/merge-pr.mjs <owner/repo> <pr number> --timeout-s 3600`. It waits for the approval, then merges only if the gate and every check are green. If it times out, tell the user to approve and rerun that command, or merge in GitHub. Never run `gh pr merge` yourself.
+>
+> **8.** Once merged, run `orca worktree set --worktree active --workspace-status done --comment "<PR url>"`. Do not remove your own worktree; the sweep does that.

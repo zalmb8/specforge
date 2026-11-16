@@ -1,18 +1,20 @@
 import { execFileSync } from 'node:child_process';
 
-// usage: sweep [--apply] [--prefix idea/]
-// Removes Orca worktrees for finished idea/ branches. Dry run unless --apply.
+// usage: sweep [--apply] [--prefix idea/ ...]
+// Removes Orca worktrees for finished idea/, spec/ and build/ branches. Dry run unless --apply.
 // A worktree is removed only if its PR merged at exactly the commit checked out here,
 // the tree is clean, and nothing is unpushed. Anything else is reported as stuck.
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
-const prefix = args.includes('--prefix') ? args[args.indexOf('--prefix') + 1] : 'idea/';
+const prefixes = args.flatMap((a, i) => (args[i - 1] === '--prefix' ? [a] : []));
+if (!prefixes.length) prefixes.push('idea/', 'spec/', 'build/');
 
 const run = (cmd, a, opts = {}) => execFileSync(cmd, a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
 const orca = (...a) => JSON.parse(run('orca', [...a, '--json'])).result;
 
 const { worktrees } = orca('worktree', 'list');
-const candidates = worktrees.filter((w) => !w.isMainWorktree && w.branch?.replace(/^refs\/heads\//, '').startsWith(prefix));
+const branchOf = (w) => w.branch?.replace(/^refs\/heads\//, '') ?? '';
+const candidates = worktrees.filter((w) => !w.isMainWorktree && prefixes.some((p) => branchOf(w).startsWith(p)));
 
 const removed = [];
 const stuck = [];

@@ -7371,7 +7371,8 @@ var import_yaml = __toESM(require_dist(), 1);
 var SCHEMA_VERSION = 1;
 var STATUSES = ["draft", "refining", "approved", "implementing", "done"];
 var TRANSITIONS = {
-  draft: ["refining"],
+  draft: ["refining", "approved"],
+  // a refine PR goes straight from main's draft to approved
   refining: ["draft", "approved"],
   approved: ["refining", "implementing"],
   implementing: ["approved", "done"],

@@ -110,3 +110,17 @@ test('spec file name must match its id', () => {
   const r = evaluateGate({ headRef: 'idea/x', changes: [change('specs/other-name.md', 'A', undefined, spec())] });
   assert.match(r.errors.join(), /file name must match id/);
 });
+
+test('decideMerge waits on a red gate only while a spec/ PR awaits its human', () => {
+  const gate = { name: 'gate / specforge/gate', status: 'completed', conclusion: 'failure' };
+  const test_ = { name: 'test', status: 'completed', conclusion: 'success' };
+  assert.equal(decideMerge([gate, test_], { awaitingHuman: true }).state, 'wait');
+  assert.equal(decideMerge([gate, test_], { awaitingHuman: false }).state, 'refuse');
+  // another failing check is never excused by the pending approval
+  assert.equal(decideMerge([gate, { ...test_, conclusion: 'failure' }], { awaitingHuman: true }).state, 'refuse');
+});
+
+test('a refine PR may go straight from draft to approved', () => {
+  const approved = spec({ status: 'approved', questions: '- [x] q', acs: AC });
+  assert.deepEqual(validateSpec(approved, { baseText: spec() }).errors, []);
+});

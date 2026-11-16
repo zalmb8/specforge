@@ -1,4 +1,5 @@
 import { decideMerge } from './merge.mjs';
+import { hasHumanApproval } from './gate.mjs';
 
 // usage: merge-pr <owner/repo> <pr-number> [--timeout-s 600]
 // Env: GH_TOKEN (an app installation token). Merges (squash) only when the gate and every check are green.
@@ -30,7 +31,12 @@ for (;;) {
   const sha = pr.body.head.sha;
   const runs = await api(`/commits/${sha}/check-runs?per_page=100`);
   if (!runs.ok) { console.error(`cannot read checks: ${runs.status}`); process.exit(1); }
-  const verdict = decideMerge(runs.body.check_runs);
+  let awaitingHuman = false;
+  if (pr.body.head.ref.startsWith('spec/')) {
+    const reviews = await api(`/pulls/${number}/reviews?per_page=100`);
+    awaitingHuman = !(reviews.ok && hasHumanApproval(reviews.body, pr.body.user.login));
+  }
+  const verdict = decideMerge(runs.body.check_runs, { awaitingHuman });
 
   if (verdict.state === 'refuse') { console.error(`refusing to merge: ${verdict.reason}`); process.exit(1); }
   if (verdict.state === 'merge') {

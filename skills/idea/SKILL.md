@@ -33,7 +33,7 @@ Seed: what the idea is, why it came up, and the relevant context from this sessi
 > SEED: ...
 >
 > 1. Copy `PLUGIN/templates/spec.md` to `specs/<slug>.md` and fill it from the seed. Status stays `draft`. Put every real unknown under "Open questions"; do not invent answers. Add acceptance criteria you can state with confidence (`verify: TBD` is fine in a draft).
-> 2. Review: spawn two `spec-reviewer` agents in parallel, each given the path to the spec file and one lens (`testability`, `scope-risk`). Do not pass the seed or your reasoning; they are independent reviewers, but they can read the repo. Fix valid findings, ignore the rest. One round only.
+> 2. Review: spawn two `spec-reviewer` agents in parallel, each given the path to the spec file and the full text of exactly one lens, read from `PLUGIN/lenses/testability.md` and `PLUGIN/lenses/scope-risk.md` (paste the text into the reviewer's prompt; do not name other lenses). Do not pass the seed or your reasoning; they are independent reviewers, but they can read the repo. Fix valid findings, ignore the rest. One round only.
 > 3. `node PLUGIN/dist/validate-cli.mjs specs/<slug>.md --base origin/main`. Fix until it passes. If the tool itself crashes, stop and report; do not push unvalidated work.
 > 4. Touch only `specs/**`. Commit (trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`). Act as the GitHub App:
 >    `export GH_TOKEN=$(node PLUGIN/dist/mint-app-token.mjs)`; push with

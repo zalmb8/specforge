@@ -4,11 +4,13 @@ import{createRequire}from'module';const require=createRequire(import.meta.url);
 import { execFileSync } from "node:child_process";
 var args = process.argv.slice(2);
 var apply = args.includes("--apply");
-var prefix = args.includes("--prefix") ? args[args.indexOf("--prefix") + 1] : "idea/";
+var prefixes = args.flatMap((a, i) => args[i - 1] === "--prefix" ? [a] : []);
+if (!prefixes.length) prefixes.push("idea/", "spec/", "build/");
 var run = (cmd, a, opts = {}) => execFileSync(cmd, a, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...opts });
 var orca = (...a) => JSON.parse(run("orca", [...a, "--json"])).result;
 var { worktrees } = orca("worktree", "list");
-var candidates = worktrees.filter((w) => !w.isMainWorktree && w.branch?.replace(/^refs\/heads\//, "").startsWith(prefix));
+var branchOf = (w) => w.branch?.replace(/^refs\/heads\//, "") ?? "";
+var candidates = worktrees.filter((w) => !w.isMainWorktree && prefixes.some((p) => branchOf(w).startsWith(p)));
 var removed = [];
 var stuck = [];
 for (const w of candidates) {
