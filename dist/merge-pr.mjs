@@ -7392,11 +7392,11 @@ function decideMerge(allRuns, { awaitingHuman = false, ignoreJob: ignoreJob2 } =
 var import_yaml = __toESM(require_dist(), 1);
 
 // src/gate.mjs
-function hasHumanApproval(reviews, prAuthor) {
+function hasHumanApproval(reviews, prAuthor, headSha) {
   const latest = /* @__PURE__ */ new Map();
   for (const r of reviews) latest.set(r.user?.login, r);
   return [...latest.values()].some(
-    (r) => r.state === "APPROVED" && r.user?.type === "User" && r.user.login !== prAuthor
+    (r) => r.state === "APPROVED" && r.user?.type === "User" && r.user.login !== prAuthor && (!headSha || r.commit_id === headSha)
   );
 }
 
@@ -7440,7 +7440,7 @@ for (; ; ) {
   let awaitingHuman = false;
   if (pr.body.head.ref.startsWith("spec/")) {
     const reviews = await api(`/pulls/${number}/reviews?per_page=100`);
-    awaitingHuman = !(reviews.ok && hasHumanApproval(reviews.body, pr.body.user.login));
+    awaitingHuman = !(reviews.ok && hasHumanApproval(reviews.body, pr.body.user.login, sha));
   }
   const verdict = decideMerge(runs.body.check_runs, { awaitingHuman, ignoreJob });
   if (verdict.state === "refuse") {

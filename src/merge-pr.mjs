@@ -35,7 +35,7 @@ for (;;) {
   let awaitingHuman = false;
   if (pr.body.head.ref.startsWith('spec/')) {
     const reviews = await api(`/pulls/${number}/reviews?per_page=100`);
-    awaitingHuman = !(reviews.ok && hasHumanApproval(reviews.body, pr.body.user.login));
+    awaitingHuman = !(reviews.ok && hasHumanApproval(reviews.body, pr.body.user.login, sha));
   }
   const verdict = decideMerge(runs.body.check_runs, { awaitingHuman, ignoreJob });
 

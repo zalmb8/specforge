@@ -69,10 +69,13 @@ export function evaluateGate({ headRef, changes, specDir = 'specs', protectedPat
   return { errors, humanRequired: [...new Set(humanRequired)] };
 }
 
-export function hasHumanApproval(reviews, prAuthor) {
+// An approval only counts for the commit it was given on: a push after the review makes it stale,
+// so the author can't change a spec after sign-off. `headSha` is the PR head, not the merge commit.
+export function hasHumanApproval(reviews, prAuthor, headSha) {
   const latest = new Map();
   for (const r of reviews) latest.set(r.user?.login, r);
   return [...latest.values()].some(
-    (r) => r.state === 'APPROVED' && r.user?.type === 'User' && r.user.login !== prAuthor,
+    (r) => r.state === 'APPROVED' && r.user?.type === 'User' && r.user.login !== prAuthor
+      && (!headSha || r.commit_id === headSha),
   );
 }

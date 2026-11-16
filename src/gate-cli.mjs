@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { parse } from 'yaml';
 import { evaluateGate, hasHumanApproval, DEFAULT_PROTECTED } from './gate.mjs';
 
-// Env (set by the reusable workflow): HEAD_REF, BASE_REF, PR_AUTHOR, PR_NUMBER, GH_TOKEN, GITHUB_REPOSITORY
+// Env (set by the reusable workflow): HEAD_REF, BASE_REF, PR_AUTHOR, PR_HEAD_SHA, PR_NUMBER, GH_TOKEN, GITHUB_REPOSITORY
 const env = process.env;
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 const show = (ref, p) => {
@@ -33,7 +33,7 @@ if (humanRequired.length && !errors.length) {
     headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
   });
   if (!res.ok) { console.error(`could not list reviews: ${res.status}`); process.exit(1); }
-  approved = hasHumanApproval(await res.json(), env.PR_AUTHOR);
+  approved = hasHumanApproval(await res.json(), env.PR_AUTHOR, env.PR_HEAD_SHA);
 }
 
 const lines = [`### specforge/gate: \`${env.HEAD_REF}\``];

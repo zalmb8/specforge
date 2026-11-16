@@ -7493,11 +7493,11 @@ function evaluateGate({ headRef, changes: changes2, specDir: specDir2 = "specs",
   }
   return { errors: errors2, humanRequired: [...new Set(humanRequired2)] };
 }
-function hasHumanApproval(reviews, prAuthor) {
+function hasHumanApproval(reviews, prAuthor, headSha) {
   const latest = /* @__PURE__ */ new Map();
   for (const r of reviews) latest.set(r.user?.login, r);
   return [...latest.values()].some(
-    (r) => r.state === "APPROVED" && r.user?.type === "User" && r.user.login !== prAuthor
+    (r) => r.state === "APPROVED" && r.user?.type === "User" && r.user.login !== prAuthor && (!headSha || r.commit_id === headSha)
   );
 }
 
@@ -7534,7 +7534,7 @@ if (humanRequired.length && !errors.length) {
     console.error(`could not list reviews: ${res.status}`);
     process.exit(1);
   }
-  approved = hasHumanApproval(await res.json(), env.PR_AUTHOR);
+  approved = hasHumanApproval(await res.json(), env.PR_AUTHOR, env.PR_HEAD_SHA);
 }
 var lines = [`### specforge/gate: \`${env.HEAD_REF}\``];
 for (const e of errors) lines.push(`- \u274C ${e}`);
