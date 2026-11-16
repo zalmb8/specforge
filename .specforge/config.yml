@@ -15,4 +15,5 @@ loops:
   spec_review_max: 3
   ci_fix_max: 5
   code_review_max: 3
-review_lenses: [testability, scope-risk, codebase-fit, consistency]
+review_lenses: []
+exclude_lenses: []
