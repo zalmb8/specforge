@@ -1,3 +1,5 @@
+import{createRequire}from'module';const require=createRequire(import.meta.url);
+
 // src/mint-app-token.mjs
 import { createSign } from "node:crypto";
 import { execFileSync } from "node:child_process";
