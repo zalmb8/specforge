@@ -1,11 +1,11 @@
 {
   "name": "specforge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "esbuild src/gate-cli.mjs src/validate-cli.mjs src/sweep.mjs --bundle --platform=node --format=esm --outdir=dist --out-extension:.js=.mjs",
-    "test": "node --test test/"
+    "test": "node --test \"test/**/*.test.mjs\""
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
