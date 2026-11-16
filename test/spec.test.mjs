@@ -94,3 +94,14 @@ test('human approval ignores bots, the author, and superseded reviews', () => {
   assert.equal(hasHumanApproval([r('zach', 'User', 'APPROVED'), r('zach', 'User', 'CHANGES_REQUESTED')], 'app[bot]'), false);
   assert.equal(hasHumanApproval([r('zach', 'User', 'APPROVED')], 'app[bot]'), true);
 });
+
+import { decideMerge } from '../src/merge.mjs';
+
+test('decideMerge waits for the gate, refuses on red, merges when all green', () => {
+  const gate = (o) => ({ name: 'gate / specforge/gate', status: 'completed', conclusion: 'success', ...o });
+  assert.equal(decideMerge([{ name: 'test', status: 'completed', conclusion: 'success' }]).state, 'wait');
+  assert.equal(decideMerge([gate({ status: 'in_progress', conclusion: null })]).state, 'wait');
+  assert.equal(decideMerge([gate({ conclusion: 'failure' })]).state, 'refuse');
+  assert.equal(decideMerge([gate(), { name: 'test', status: 'completed', conclusion: 'failure' }]).state, 'refuse');
+  assert.equal(decideMerge([gate(), { name: 'test', status: 'completed', conclusion: 'success' }]).state, 'merge');
+});
