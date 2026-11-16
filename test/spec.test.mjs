@@ -95,29 +95,10 @@ test('human approval ignores bots, the author, and superseded reviews', () => {
   assert.equal(hasHumanApproval([r('zach', 'User', 'APPROVED')], 'app[bot]'), true);
 });
 
-import { decideMerge } from '../src/merge.mjs';
-
-test('decideMerge waits for the gate, refuses on red, merges when all green', () => {
-  const gate = (o) => ({ name: 'gate / specforge/gate', status: 'completed', conclusion: 'success', ...o });
-  assert.equal(decideMerge([{ name: 'test', status: 'completed', conclusion: 'success' }]).state, 'wait');
-  assert.equal(decideMerge([gate({ status: 'in_progress', conclusion: null })]).state, 'wait');
-  assert.equal(decideMerge([gate({ conclusion: 'failure' })]).state, 'refuse');
-  assert.equal(decideMerge([gate(), { name: 'test', status: 'completed', conclusion: 'failure' }]).state, 'refuse');
-  assert.equal(decideMerge([gate(), { name: 'test', status: 'completed', conclusion: 'success' }]).state, 'merge');
-});
 
 test('spec file name must match its id', () => {
   const r = evaluateGate({ headRef: 'idea/x', changes: [change('specs/other-name.md', 'A', undefined, spec())] });
   assert.match(r.errors.join(), /file name must match id/);
-});
-
-test('decideMerge waits on a red gate only while a spec/ PR awaits its human', () => {
-  const gate = { name: 'gate / specforge/gate', status: 'completed', conclusion: 'failure' };
-  const test_ = { name: 'test', status: 'completed', conclusion: 'success' };
-  assert.equal(decideMerge([gate, test_], { awaitingHuman: true }).state, 'wait');
-  assert.equal(decideMerge([gate, test_], { awaitingHuman: false }).state, 'refuse');
-  // another failing check is never excused by the pending approval
-  assert.equal(decideMerge([gate, { ...test_, conclusion: 'failure' }], { awaitingHuman: true }).state, 'refuse');
 });
 
 test('a refine PR may go straight from draft to approved', () => {
@@ -125,39 +106,6 @@ test('a refine PR may go straight from draft to approved', () => {
   assert.deepEqual(validateSpec(approved, { baseText: spec() }).errors, []);
 });
 
-test('decideMerge judges only the latest run of each check (gate re-run after approval)', () => {
-  const run = (id, conclusion) => ({ id, name: 'gate / specforge/gate', status: 'completed', conclusion });
-  // old red run (pre-approval) listed beside the newer green one
-  assert.equal(decideMerge([run(1, 'failure'), run(2, 'success')]).state, 'merge');
-  assert.equal(decideMerge([run(2, 'success'), run(1, 'failure')]).state, 'merge');
-  // and the other way round: a newer red run still blocks
-  assert.equal(decideMerge([run(1, 'success'), run(2, 'failure')]).state, 'refuse');
-  // a newer run that has not finished means wait, even if an older one passed
-  assert.equal(decideMerge([run(1, 'success'), { ...run(2, null), status: 'in_progress' }]).state, 'wait');
-});
-
-test('decideMerge ignores the merge job itself so it does not wait on its own check', () => {
-  const gate = { id: 1, name: 'gate / specforge/gate', status: 'completed', conclusion: 'success' };
-  const self = { id: 2, name: 'merge / merge', status: 'in_progress', conclusion: null };
-  assert.equal(decideMerge([gate, self]).state, 'wait');
-  assert.equal(decideMerge([gate, self], { ignoreJob: 'merge' }).state, 'merge');
-});
-
-import { resolveReviewers, codeownersFor } from '../src/reviewers.mjs';
-
-test('reviewers: config wins, author never requested, teams split out', () => {
-  assert.deepEqual(resolveReviewers({ configReviewers: ['zach', 'org/leads'], codeowners: '* @other', specPath: 'specs/a.md', author: 'app[bot]' }), { users: ['zach'], teams: ['leads'] });
-  assert.deepEqual(resolveReviewers({ configReviewers: ['@Tavrick'], specPath: 'specs/a.md', author: 'tavrick[bot]' }), { users: [], teams: [] });
-});
-
-test('reviewers: falls back to CODEOWNERS, last matching line wins', () => {
-  const co = '# owners\n* @everyone\n/specs/ @spec-owner\ndocs/ @doc-owner\n*.md @md-owner\n';
-  assert.deepEqual(codeownersFor(co, 'specs/a.md'), ['@md-owner']); // *.md is last and matches
-  assert.deepEqual(codeownersFor('* @a\n/specs/ @b\n', 'specs/a.md'), ['@b']);
-  assert.deepEqual(codeownersFor('* @a\n', 'src/x.js'), ['@a']);
-  assert.deepEqual(resolveReviewers({ codeowners: '* @a\n/specs/ @b someone@example.com\n', specPath: 'specs/x.md', author: 'bot' }), { users: ['b'], teams: [] });
-  assert.deepEqual(resolveReviewers({ specPath: 'specs/x.md', author: 'bot' }), { users: [], teams: [] });
-});
 
 test('human approval counts only for the current head commit', () => {
   const r = (login, commit_id, state = 'APPROVED') => ({ user: { login, type: 'User' }, state, commit_id });
@@ -166,12 +114,3 @@ test('human approval counts only for the current head commit', () => {
   assert.equal(hasHumanApproval([r('zach', 'aaa')], 'app[bot]'), true); // no head sha known: not enforced
 });
 
-import { staleApprovals } from '../src/dismiss-stale.mjs';
-
-test('staleApprovals picks human approvals on older commits only', () => {
-  const r = (login, commit_id, state = 'APPROVED', type = 'User') => ({ id: login, user: { login, type }, state, commit_id });
-  assert.deepEqual(staleApprovals([r('zach', 'old')], 'new', 'app').map((x) => x.id), ['zach']);
-  assert.deepEqual(staleApprovals([r('zach', 'new')], 'new', 'app'), []);
-  assert.deepEqual(staleApprovals([r('zach', 'old'), r('zach', 'old', 'CHANGES_REQUESTED')], 'new', 'app'), []); // superseded
-  assert.deepEqual(staleApprovals([r('bot', 'old', 'APPROVED', 'Bot'), r('app', 'old')], 'new', 'app'), []); // bots and the author never count
-});

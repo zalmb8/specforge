@@ -1,6 +1,6 @@
 ---
 name: idea
-description: Capture an idea found mid-session as a draft spec on an idea/ branch, in its own Orca worktree, merged automatically once checks are green. Use when the user says "spec this idea", "capture this", or you notice a worthwhile idea outside the current task.
+description: Capture an idea found mid-session as a draft spec on an idea/ branch, in its own Orca worktree, merged automatically by GitHub once checks are green. Use when the user says "spec this idea", "capture this", or you notice a worthwhile idea outside the current task.
 ---
 
 # specforge idea
@@ -38,5 +38,5 @@ Seed: what the idea is, why it came up, and the relevant context from this sessi
 > 4. Touch only `specs/**`. Commit (trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`). Act as the GitHub App:
 >    `export GH_TOKEN=$(node PLUGIN/dist/mint-app-token.mjs)`; push with
 >    `git -c credential.helper= -c "credential.helper=!f() { echo username=x-access-token; echo password=$GH_TOKEN; }; f" push -u origin idea/<slug>`; open a PR titled `idea: <title>` with `gh` (end the body with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`).
-> 5. Merge only through the guard: `node PLUGIN/dist/merge-pr.mjs <owner/repo> <pr number>`. It waits for `specforge/gate` and every other check, and refuses on red. Never run `gh pr merge` yourself. If it refuses twice, stop and leave a PR comment saying why.
+> 5. Enable GitHub's native auto-merge as the app: `gh pr merge <pr number> --squash --auto`. GitHub then merges once the required checks, including `specforge/gate`, pass. Never merge any other way. Idea checks take seconds, so run `gh pr checks <pr number> --watch` once; if a check is red, fix it if you can (one retry), otherwise leave a PR comment saying why and stop.
 > 6. `orca worktree set --worktree active --workspace-status done --comment "<PR url>"`. Do not remove your own worktree; the sweep does that. Final message: PR url, outcome, and any problem you hit.

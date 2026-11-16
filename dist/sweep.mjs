@@ -41,10 +41,6 @@ for (const w of candidates) {
       continue;
     }
     if (apply) {
-      try {
-        run("gh", ["api", "-X", "DELETE", `repos/{owner}/{repo}/git/refs/heads/${branch}`], { cwd: w.path });
-      } catch {
-      }
       run("orca", ["worktree", "rm", "--worktree", `id:${w.id}`, "--delete-branch", "--json"]);
     }
     removed.push(label);
