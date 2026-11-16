@@ -33,8 +33,11 @@ for (const w of candidates) {
     }
     const head = run("git", ["rev-parse", "HEAD"], { cwd: w.path }).trim();
     if (head !== pr.headRefOid) {
-      stuck.push(`${label}: local commits differ from merged PR ${pr.url}`);
-      continue;
+      const cmp = JSON.parse(run("gh", ["api", `repos/{owner}/{repo}/compare/${head}...${pr.headRefOid}`], { cwd: w.path }));
+      if (!["ahead", "identical"].includes(cmp.status)) {
+        stuck.push(`${label}: local commits not in merged PR ${pr.url}`);
+        continue;
+      }
     }
     if (run("git", ["status", "--porcelain"], { cwd: w.path }).trim()) {
       stuck.push(`${label}: uncommitted changes`);
