@@ -14,6 +14,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      checks: read          # merge-pr reads the gate's check run
     steps:
       - uses: actions/checkout@v4
         with:
