@@ -2,6 +2,7 @@
 specforge: 1
 spec_dir: specs
 default_branch: main
+reviewers: []                # GitHub users (or org/team) requested on spec/ PRs; empty falls back to CODEOWNERS
 protected_paths: []          # extra regexes that always need a human, e.g. ^migrations/
 commands:
   test: npm test
