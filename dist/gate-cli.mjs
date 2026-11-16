@@ -7454,8 +7454,10 @@ function evaluateGate({ headRef, changes: changes2, specDir: specDir2 = "specs",
       errors2.push(`${c.path}: specs must not be deleted by a PR`);
       continue;
     }
-    const { errors: errs } = validateSpec(c.head, { baseText: c.base });
+    const { errors: errs, data } = validateSpec(c.head, { baseText: c.base });
     errors2.push(...errs.map((e) => `${c.path}: ${e}`));
+    const stem = c.path.split("/").pop().replace(/\.md$/, "");
+    if (data?.id && data.id !== stem) errors2.push(`${c.path}: file name must match id (${data.id}.md)`);
   }
   if (kind === "idea") {
     for (const c of changes2) {

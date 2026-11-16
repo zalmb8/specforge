@@ -7363,6 +7363,7 @@ var require_dist = __commonJS({
 
 // src/validate-cli.mjs
 import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { execFileSync } from "node:child_process";
 
 // src/spec.mjs
@@ -7452,7 +7453,9 @@ for (const file of args) {
       baseText = void 0;
     }
   }
-  const { errors } = validateSpec(readFileSync(file, "utf8"), { baseText });
+  const { errors, data } = validateSpec(readFileSync(file, "utf8"), { baseText });
+  const stem = basename(file).replace(/\.md$/, "");
+  if (data?.id && data.id !== stem) errors.push(`file name must match id (${data.id}.md)`);
   if (errors.length) {
     failed = true;
     console.error(`FAIL ${file}

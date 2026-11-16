@@ -10,7 +10,7 @@ const run = (file, args = [], env = {}) =>
   spawnSync('node', [file, ...args], { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: mkdtempSync(join(tmpdir(), 'sf-')), ...env } });
 
 test('dist/validate-cli passes a valid spec and fails an invalid one', () => {
-  const ok = run('dist/validate-cli.mjs', ['test/fixtures/valid-draft.md']);
+  const ok = run('dist/validate-cli.mjs', ['test/fixtures/fixture.md']);
   assert.equal(ok.status, 0, ok.stderr);
   const dir = mkdtempSync(join(tmpdir(), 'sf-'));
   const bad = join(dir, 'bad.md');
