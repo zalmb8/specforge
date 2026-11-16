@@ -109,7 +109,7 @@ When you want to work on a draft, run **`/specforge:refine <slug>`**. A unique p
 
 CODEOWNERS requests you as reviewer. The `specforge/gate` status stays `pending` until you approve. **Review the PR on GitHub and approve it.** The status flips to success and GitHub merges it and deletes the branch. The PR description lists every review finding the agent pushed back on, with its reasoning, so you can check it.
 
-If someone pushes to the PR after you approve it, GitHub dismisses your approval and the gate waits for a fresh one on the new commit.
+If someone pushes to the PR after you approve it, GitHub dismisses your approval and the gate goes back to `pending` until you approve the new commit. GitHub does not re-request your review when it does this, so look for the dismissed review on the PR page (or use the PR's *Re-request review* button).
 
 ### Build
 
