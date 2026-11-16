@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write  # re-requests review from reviewers whose approval went stale
       statuses: write       # the gate reports the required `specforge/gate` commit status
     steps:
       - uses: actions/checkout@v4

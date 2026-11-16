@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { parse } from 'yaml';
-import { evaluateGate, hasHumanApproval, gateState, DEFAULT_PROTECTED } from './gate.mjs';
+import { evaluateGate, hasHumanApproval, gateState, reviewersToRerequest, DEFAULT_PROTECTED } from './gate.mjs';
 
 // Reports the required commit status `specforge/gate` on the PR head commit.
 // Env (set by the reusable workflow): HEAD_REF, BASE_REF, PR_AUTHOR, PR_HEAD_SHA, PR_NUMBER, GH_TOKEN, GITHUB_REPOSITORY
@@ -29,12 +29,14 @@ const changes = git('diff', '--name-status', '--no-renames', `${baseRef}...HEAD`
 const { errors, humanRequired } = evaluateGate({ headRef: env.HEAD_REF, changes, specDir, protectedPaths });
 
 let approved = false;
+let reviews = [];
 if (humanRequired.length && !errors.length) {
   const res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/pulls/${env.PR_NUMBER}/reviews?per_page=100`, {
     headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
   });
   if (!res.ok) { console.error(`could not list reviews: ${res.status}`); process.exit(1); }
-  approved = hasHumanApproval(await res.json(), env.PR_AUTHOR, env.PR_HEAD_SHA);
+  reviews = await res.json();
+  approved = hasHumanApproval(reviews, env.PR_AUTHOR, env.PR_HEAD_SHA);
 }
 
 const lines = [`### specforge/gate: \`${env.HEAD_REF}\``];
@@ -52,6 +54,22 @@ const res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/s
 });
 if (!res.ok) { console.error(`could not post the gate status: ${res.status} ${await res.text()}`); process.exit(1); }
 console.log(`specforge/gate: ${state} (${description})`);
+// While waiting for a human, ask again whoever's approval went stale. Never fails the gate.
+if (state === 'pending') {
+  try {
+    const gh = (path, init = {}) => fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}${path}`, {
+      ...init, headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
+    });
+    const pr = await (await gh(`/pulls/${env.PR_NUMBER}`)).json();
+    const again = reviewersToRerequest(reviews, env.PR_HEAD_SHA, env.PR_AUTHOR, (pr.requested_reviewers ?? []).map((u) => u.login));
+    if (again.length) {
+      const r = await gh(`/pulls/${env.PR_NUMBER}/requested_reviewers`, { method: 'POST', body: JSON.stringify({ reviewers: again }) });
+      console.log(r.ok ? `re-requested review from ${again.join(', ')}` : `could not re-request review (${r.status})`);
+    }
+  } catch (e) {
+    console.warn(`could not re-request review: ${e.message}`);
+  }
+}
 // The status is what branch protection requires. The job only turns red for real violations,
 // not while it is waiting for a human.
 process.exit(state === 'failure' ? 1 : 0);

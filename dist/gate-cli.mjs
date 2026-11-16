@@ -7498,9 +7498,14 @@ function gateState({ errors: errors2, humanRequired: humanRequired2, approved: a
   if (humanRequired2.length && !approved2) return { state: "pending", description: "Waiting for a human approval on the current commit" };
   return { state: "success", description: humanRequired2.length ? "Approved by a human" : "No human approval required" };
 }
-function hasHumanApproval(reviews, prAuthor, headSha) {
+function reviewersToRerequest(reviews2, headSha, prAuthor, alreadyRequested = []) {
   const latest = /* @__PURE__ */ new Map();
-  for (const r of reviews) latest.set(r.user?.login, r);
+  for (const r of reviews2) latest.set(r.user?.login, r);
+  return [...latest.values()].filter((r) => r.user?.type === "User" && r.user.login !== prAuthor && (r.state === "DISMISSED" || r.state === "APPROVED" && r.commit_id !== headSha)).map((r) => r.user.login).filter((login) => !alreadyRequested.includes(login));
+}
+function hasHumanApproval(reviews2, prAuthor, headSha) {
+  const latest = /* @__PURE__ */ new Map();
+  for (const r of reviews2) latest.set(r.user?.login, r);
   return [...latest.values()].some(
     (r) => r.state === "APPROVED" && r.user?.type === "User" && r.user.login !== prAuthor && (!headSha || r.commit_id === headSha)
   );
@@ -7531,6 +7536,7 @@ var changes = git("diff", "--name-status", "--no-renames", `${baseRef}...HEAD`).
 });
 var { errors, humanRequired } = evaluateGate({ headRef: env.HEAD_REF, changes, specDir, protectedPaths });
 var approved = false;
+var reviews = [];
 if (humanRequired.length && !errors.length) {
   const res2 = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/pulls/${env.PR_NUMBER}/reviews?per_page=100`, {
     headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json" }
@@ -7539,7 +7545,8 @@ if (humanRequired.length && !errors.length) {
     console.error(`could not list reviews: ${res2.status}`);
     process.exit(1);
   }
-  approved = hasHumanApproval(await res2.json(), env.PR_AUTHOR, env.PR_HEAD_SHA);
+  reviews = await res2.json();
+  approved = hasHumanApproval(reviews, env.PR_AUTHOR, env.PR_HEAD_SHA);
 }
 var lines = [`### specforge/gate: \`${env.HEAD_REF}\``];
 for (const e of errors) lines.push(`- \u274C ${e}`);
@@ -7558,4 +7565,20 @@ if (!res.ok) {
   process.exit(1);
 }
 console.log(`specforge/gate: ${state} (${description})`);
+if (state === "pending") {
+  try {
+    const gh = (path, init = {}) => fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}${path}`, {
+      ...init,
+      headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json" }
+    });
+    const pr = await (await gh(`/pulls/${env.PR_NUMBER}`)).json();
+    const again = reviewersToRerequest(reviews, env.PR_HEAD_SHA, env.PR_AUTHOR, (pr.requested_reviewers ?? []).map((u) => u.login));
+    if (again.length) {
+      const r = await gh(`/pulls/${env.PR_NUMBER}/requested_reviewers`, { method: "POST", body: JSON.stringify({ reviewers: again }) });
+      console.log(r.ok ? `re-requested review from ${again.join(", ")}` : `could not re-request review (${r.status})`);
+    }
+  } catch (e) {
+    console.warn(`could not re-request review: ${e.message}`);
+  }
+}
 process.exit(state === "failure" ? 1 : 0);
