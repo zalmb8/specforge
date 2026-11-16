@@ -38,7 +38,13 @@ for (const w of candidates) {
       stuck.push(`${label}: uncommitted changes`);
       continue;
     }
-    if (apply) run("orca", ["worktree", "rm", "--worktree", `id:${w.id}`, "--delete-branch", "--json"]);
+    if (apply) {
+      try {
+        run("gh", ["api", "-X", "DELETE", `repos/{owner}/{repo}/git/refs/heads/${branch}`], { cwd: w.path });
+      } catch {
+      }
+      run("orca", ["worktree", "rm", "--worktree", `id:${w.id}`, "--delete-branch", "--json"]);
+    }
     removed.push(label);
   } catch (e) {
     stuck.push(`${label}: ${String(e.stderr || e.message).split("\n")[0]}`);
