@@ -158,3 +158,10 @@ test('reviewers: falls back to CODEOWNERS, last matching line wins', () => {
   assert.deepEqual(resolveReviewers({ codeowners: '* @a\n/specs/ @b someone@example.com\n', specPath: 'specs/x.md', author: 'bot' }), { users: ['b'], teams: [] });
   assert.deepEqual(resolveReviewers({ specPath: 'specs/x.md', author: 'bot' }), { users: [], teams: [] });
 });
+
+test('human approval counts only for the current head commit', () => {
+  const r = (login, commit_id, state = 'APPROVED') => ({ user: { login, type: 'User' }, state, commit_id });
+  assert.equal(hasHumanApproval([r('zach', 'aaa')], 'app[bot]', 'aaa'), true);
+  assert.equal(hasHumanApproval([r('zach', 'aaa')], 'app[bot]', 'bbb'), false); // pushed after approval
+  assert.equal(hasHumanApproval([r('zach', 'aaa')], 'app[bot]'), true); // no head sha known: not enforced
+});
