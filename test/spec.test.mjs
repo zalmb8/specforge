@@ -124,3 +124,14 @@ test('a refine PR may go straight from draft to approved', () => {
   const approved = spec({ status: 'approved', questions: '- [x] q', acs: AC });
   assert.deepEqual(validateSpec(approved, { baseText: spec() }).errors, []);
 });
+
+test('decideMerge judges only the latest run of each check (gate re-run after approval)', () => {
+  const run = (id, conclusion) => ({ id, name: 'gate / specforge/gate', status: 'completed', conclusion });
+  // old red run (pre-approval) listed beside the newer green one
+  assert.equal(decideMerge([run(1, 'failure'), run(2, 'success')]).state, 'merge');
+  assert.equal(decideMerge([run(2, 'success'), run(1, 'failure')]).state, 'merge');
+  // and the other way round: a newer red run still blocks
+  assert.equal(decideMerge([run(1, 'success'), run(2, 'failure')]).state, 'refuse');
+  // a newer run that has not finished means wait, even if an older one passed
+  assert.equal(decideMerge([run(1, 'success'), { ...run(2, null), status: 'in_progress' }]).state, 'wait');
+});

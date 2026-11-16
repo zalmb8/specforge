@@ -2,6 +2,18 @@
 const GATE = /(^|\/|\s)specforge\/gate$/;
 const OK = new Set(['success', 'skipped', 'neutral']);
 
+// A check re-run (for example the gate re-running on a review) leaves the older run listed
+// beside the new one. Only the most recent run of each check name counts.
+function latestPerName(runs) {
+  const latest = new Map();
+  for (const r of runs) {
+    const prev = latest.get(r.name);
+    const newer = !prev || (r.id ?? 0) > (prev.id ?? 0);
+    if (newer) latest.set(r.name, r);
+  }
+  return [...latest.values()];
+}
+
 /**
  * checkRuns: [{ name, status, conclusion }] for the PR head commit.
  * awaitingHuman: a spec/ PR with no human approval yet. Its gate is red by design, so that
@@ -9,7 +21,8 @@ const OK = new Set(['success', 'skipped', 'neutral']);
  * Returns { state: 'merge' | 'wait' | 'refuse', reason }.
  * Refuses (never merges) unless the specforge gate ran and every check passed.
  */
-export function decideMerge(checkRuns, { awaitingHuman = false } = {}) {
+export function decideMerge(allRuns, { awaitingHuman = false } = {}) {
+  const checkRuns = latestPerName(allRuns);
   const gate = checkRuns.find((r) => GATE.test(r.name));
   if (!gate) return { state: 'wait', reason: 'specforge/gate has not reported yet' };
   const pending = checkRuns.filter((r) => r.status !== 'completed');

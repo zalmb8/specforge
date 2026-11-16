@@ -7364,7 +7364,17 @@ var require_dist = __commonJS({
 // src/merge.mjs
 var GATE = /(^|\/|\s)specforge\/gate$/;
 var OK = /* @__PURE__ */ new Set(["success", "skipped", "neutral"]);
-function decideMerge(checkRuns, { awaitingHuman = false } = {}) {
+function latestPerName(runs) {
+  const latest = /* @__PURE__ */ new Map();
+  for (const r of runs) {
+    const prev = latest.get(r.name);
+    const newer = !prev || (r.id ?? 0) > (prev.id ?? 0);
+    if (newer) latest.set(r.name, r);
+  }
+  return [...latest.values()];
+}
+function decideMerge(allRuns, { awaitingHuman = false } = {}) {
+  const checkRuns = latestPerName(allRuns);
   const gate = checkRuns.find((r) => GATE.test(r.name));
   if (!gate) return { state: "wait", reason: "specforge/gate has not reported yet" };
   const pending = checkRuns.filter((r) => r.status !== "completed");
