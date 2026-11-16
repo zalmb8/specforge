@@ -1,0 +1,121 @@
+{
+  "specforge": 1,
+  "spec": "archive-done-specs",
+  "sha": "a2a116d207cbe1ab786015aea1104ed1ccc8b333",
+  "results": [
+    {
+      "id": "AC-1",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: validateTree resolves a dependency on an archived spec$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: validateTree resolves a dependency on an archived spec ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-2",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: build gate dependency check sees archived specs$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: build gate dependency check sees archived specs ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-3",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: archived file name must match its id$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: archived file name must match its id ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-4",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: the evidence must move byte-identical with the spec$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: the evidence must move byte-identical with the spec ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-5",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: a move leaves referrers valid and unchanged$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: a move leaves referrers valid and unchanged ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-6",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: only done specs may be archived$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: only done specs may be archived ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-7",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: a clean move passes with no human$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: a clean move passes with no human ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-8",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: deleting a done spec without moving it fails$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: deleting a done spec without moving it fails ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-9",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: no archive leaves existing gate results unchanged$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: no archive leaves existing gate results unchanged ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-10",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: specsAt lists archived specs in a real repo$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: specsAt lists archived specs in a real repo ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-11",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: planArchive picks exactly the done unarchived specs$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: planArchive picks exactly the done unarchived specs ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-12",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: the sweep prefix list includes archive$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: the sweep prefix list includes archive ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-13",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: archived files are immutable$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: archived files are immutable ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-14",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: restore needs a spec branch and a human$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: restore needs a spec branch and a human ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-15",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: an archive PR moves exactly its own spec$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: an archive PR moves exactly its own spec ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-16",
+      "target": "grep -E '^4\\. \\*\\*Check dependencies' skills/build/SKILL.md | grep -qF '<spec_dir>/archive/<id>.md' && grep -E '^> \\*\\*1\\. Read\\*\\*' skills/build/SKILL.md | grep -qF '<spec_dir>/archive/<id>.md'",
+      "result": "pass",
+      "detail": "Ran the grep check as written; exit 0"
+    },
+    {
+      "id": "AC-17",
+      "target": "grep -qF 'SWEEP_PREFIXES' src/sweep.mjs && ! grep -qF \"'idea/', 'spec/', 'build/'\" src/sweep.mjs",
+      "result": "pass",
+      "detail": "Ran the grep check as written; exit 0"
+    },
+    {
+      "id": "AC-18",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: the command does nothing unless archive is true$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: the command does nothing unless archive is true ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    },
+    {
+      "id": "AC-19",
+      "target": "node --test --test-reporter=spec --test-name-pattern='^archive: validateTree rejects a duplicate id across active and archived$' test/archive.test.mjs 2>&1 | grep -q '^✔ archive: validateTree rejects a duplicate id across active and archived ('",
+      "result": "pass",
+      "detail": "Ran named test via node --test spec reporter; grep matched the passing line (exit 0)"
+    }
+  ]
+}

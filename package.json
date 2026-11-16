@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/gate-cli.mjs src/validate-cli.mjs src/sweep.mjs src/mint-app-token.mjs --bundle --platform=node --format=esm --outdir=dist --out-extension:.js=.mjs --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "build": "esbuild src/gate-cli.mjs src/validate-cli.mjs src/sweep.mjs src/archive.mjs src/mint-app-token.mjs --bundle --platform=node --format=esm --outdir=dist --out-extension:.js=.mjs --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
     "test": "node --test \"test/**/*.test.mjs\""
   },
   "devDependencies": {

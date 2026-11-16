@@ -18,7 +18,7 @@ test('dist/validate-cli passes a valid spec and fails an invalid one', () => {
   assert.equal(run('dist/validate-cli.mjs', [bad]).status, 1);
 });
 
-for (const f of ['gate-cli', 'mint-app-token', 'sweep']) {
+for (const f of ['gate-cli', 'mint-app-token', 'sweep', 'archive']) {
   test(`dist/${f} loads without a module error`, () => {
     const r = run(`dist/${f}.mjs`);
     assert.doesNotMatch(r.stderr, /Dynamic require|Cannot find module|SyntaxError|ERR_/, r.stderr);

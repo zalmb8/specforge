@@ -9,6 +9,18 @@ const inSpecDir = (specDir, p) => p.startsWith(`${specDir}/`) && p.endsWith('.md
 const acceptanceOf = (text) => JSON.stringify(parseSpec(text ?? '').data?.acceptance ?? null);
 const dependsOf = (text) => JSON.stringify(parseSpec(text ?? '').data?.depends_on ?? []);
 
+/** Where a done spec and its evidence live once archived. Nothing else hardcodes these. */
+export const archivePath = (specDir, id) => `${specDir}/archive/${id}.md`;
+export const archiveEvidencePath = (specDir, id) => `${specDir}/archive/evidence/${id}.json`;
+/** Whether a path is under the archive; evidence is JSON, so unlike inSpecDir this matches both. */
+export const isArchived = (specDir, p) => p.startsWith(`${specDir}/archive/`) && /\.(md|json)$/.test(p);
+// The spec id an archived path belongs to, or undefined if it is not one of the two archive locations.
+const archivedId = (specDir, p) => {
+  const rest = p.slice(`${specDir}/archive/`.length);
+  const m = /^(?:evidence\/([^/]+)\.json|([^/]+)\.md)$/.exec(rest);
+  return m ? (m[1] ?? m[2]) : undefined;
+};
+
 /** Where the AC evidence for a spec lives. It is JSON, so spec validation never parses it. */
 export const evidencePath = (specDir, id) => `${specDir}/evidence/${id}.json`;
 
@@ -63,7 +75,64 @@ export function evaluateGate({
   const humanRequired = [];
   const pending = [];
   const kind = headRef.split('/')[0];
-  const specs = changes.filter((c) => inSpecDir(specDir, c.path));
+  const byPath = new Map(changes.map((c) => [c.path, c]));
+
+  // Paths the archive rules below judge on their own, so the generic spec rules do not also fire
+  // (and contradict them) on a valid move or restore.
+  const handled = new Set();
+  const archiveIds = new Set();
+  for (const c of changes.filter((x) => isArchived(specDir, x.path))) {
+    handled.add(c.path);
+    const id = archivedId(specDir, c.path);
+    if (id) archiveIds.add(id);
+    else errors.push(`${c.path}: files under ${specDir}/archive/ must be <id>.md or evidence/<id>.json`);
+  }
+  for (const id of archiveIds) {
+    const aS = byPath.get(archivePath(specDir, id));
+    const aE = byPath.get(archiveEvidencePath(specDir, id));
+    const s = byPath.get(`${specDir}/${id}.md`);
+    const e = byPath.get(evidencePath(specDir, id));
+    for (const c of [aS, aE]) {
+      if (c?.status === 'M') errors.push(`${c.path}: archived files are immutable`);
+    }
+    // A move: the active file deleted and the same bytes added in the archive.
+    for (const [a, d] of [[aS, s], [aE, e]]) {
+      if (a?.status === 'A') {
+        if (kind !== 'archive') errors.push(`${a.path}: only an archive/<id> branch may add to the archive`);
+        if (d?.status === 'D' && d.base === a.head) handled.add(d.path);
+      }
+    }
+    for (const c of [aS].filter((x) => x?.status === 'A')) {
+      const { data, errors: errs } = validateSpec(c.head, { baseText: s?.base ?? c.head });
+      errors.push(...errs.map((x) => `${c.path}: ${x}`));
+      if (data?.status !== 'done') errors.push(`${c.path}: only done specs may be archived (${data?.id ?? id} is ${data?.status})`);
+      if (data?.id && data.id !== id) errors.push(`${c.path}: file name must match id (${data.id}.md)`);
+    }
+    // A restore: the archived files deleted and the same bytes added at the active paths.
+    if ([aS, aE].some((c) => c?.status === 'D')) {
+      const problems = [];
+      if (kind !== 'spec') problems.push('needs a spec/ branch');
+      if (aS?.status !== 'D' || aE?.status !== 'D') problems.push('must restore both the spec and its evidence');
+      else {
+        if (s?.status !== 'A' || s.head !== aS.base) problems.push(`${s?.path ?? `${specDir}/${id}.md`} must be added unchanged`);
+        if (e?.status !== 'A' || e.head !== aE.base) problems.push(`${e?.path ?? evidencePath(specDir, id)} must be added unchanged`);
+        if (parseSpec(aS.base ?? '').data?.status !== 'done') problems.push('only a done spec can be restored');
+      }
+      if (!problems.length) {
+        const { errors: errs } = validateSpec(s.head, { baseText: aS.base });
+        problems.push(...errs);
+      }
+      if (problems.length) {
+        errors.push(`restore of ${id}: ${problems.join('; ')}`);
+        for (const c of [aS, aE]) if (c?.status === 'D') errors.push(`${c.path}: archived files are immutable`);
+      } else {
+        handled.add(s.path);
+        handled.add(e.path);
+        humanRequired.push(`restore of ${id} from the archive`);
+      }
+    }
+  }
+  const specs = changes.filter((c) => inSpecDir(specDir, c.path) && !handled.has(c.path));
 
   for (const c of specs) {
     if (c.status === 'D') {
@@ -82,11 +151,11 @@ export function evaluateGate({
     const stem = c.path.split('/').pop().replace(/\.md$/, '');
     if (data?.id && data.id !== stem) errors.push(`${c.path}: file name must match id (${data.id}.md)`);
   }
-  if (specs.length) errors.push(...validateTree(headSpecs));
+  if (specs.length || archiveIds.size || kind === 'archive') errors.push(...validateTree(headSpecs));
 
   if (kind === 'idea') {
     for (const c of changes) {
-      if (!inSpecDir(specDir, c.path)) errors.push(`${c.path}: idea/ branches may only touch ${specDir}/**`);
+      if (!inSpecDir(specDir, c.path) && !handled.has(c.path)) errors.push(`${c.path}: idea/ branches may only touch ${specDir}/**`);
     }
     for (const c of specs) {
       if (c.base !== undefined && parseSpec(c.base).data?.status !== 'draft') {
@@ -99,7 +168,7 @@ export function evaluateGate({
   } else if (kind === 'spec') {
     humanRequired.push('spec/ PRs need human approval');
     for (const c of changes) {
-      if (!inSpecDir(specDir, c.path)) errors.push(`${c.path}: spec/ branches may only touch ${specDir}/**`);
+      if (!inSpecDir(specDir, c.path) && !handled.has(c.path)) errors.push(`${c.path}: spec/ branches may only touch ${specDir}/**`);
     }
   } else if (kind === 'build') {
     const id = headRef.slice('build/'.length);
@@ -136,6 +205,32 @@ export function evaluateGate({
         const problems = checkEvidence({ headSpec, evidence });
         if (problems.length) pending.push(`AC evidence: ${problems.join('; ')}`);
       }
+    }
+  } else if (kind === 'archive') {
+    // One spec per PR, moved byte-for-byte; exactness is the only control, so nothing else may change.
+    const id = headRef.slice('archive/'.length);
+    const files = [
+      ['spec', `${specDir}/${id}.md`, archivePath(specDir, id)],
+      ['evidence', evidencePath(specDir, id), archiveEvidencePath(specDir, id)],
+    ];
+    const allowed = new Set(files.flatMap(([, from, to]) => [from, to]));
+    for (const c of changes) {
+      if (!allowed.has(c.path)) errors.push(`${c.path}: archive/${id} may only move ${id}'s spec and evidence`);
+    }
+    for (const [what, from, to] of files) {
+      const d = byPath.get(from);
+      const a = byPath.get(to);
+      if (d?.status !== 'D') errors.push(`${from}: the active ${what} must be deleted`);
+      if (a?.status !== 'A') errors.push(`${to}: the ${what} must be added to the archive`);
+      else if (d?.status === 'D' && d.base !== a.head) errors.push(`${to}: the archived ${what} must be identical to ${from}`);
+    }
+    const moved = byPath.get(archivePath(specDir, id));
+    if (moved?.head !== undefined) {
+      const movedId = parseSpec(moved.head).data?.id;
+      if (movedId !== id) errors.push(`${moved.path}: the moved spec's id must be ${id} (got ${movedId})`);
+    }
+    for (const c of changes) {
+      if (protectedRes.some((re) => re.test(c.path))) humanRequired.push(`${c.path}: protected path`);
     }
   }
   // Any other branch is a normal human PR: only touched specs are validated.

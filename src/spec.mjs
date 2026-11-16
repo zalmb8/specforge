@@ -99,11 +99,18 @@ export function validateSpec(text, { baseText } = {}) {
 
 /**
  * Checks the whole dependency tree: every depends_on must name an existing spec, and there must
- * be no cycles. specs: [{ id, depends_on? }]. Returns a list of error strings.
+ * be no cycles, and no two specs may share an id. specs: [{ id, depends_on? }]. Returns a list of error strings.
  */
 export function validateTree(specs) {
   const errors = [];
   const byId = new Map(specs.map((s) => [s.id, s]));
+  if (byId.size !== specs.length) {
+    const seen = new Set();
+    for (const s of specs) {
+      if (seen.has(s.id)) errors.push(`duplicate spec id "${s.id}"`);
+      seen.add(s.id);
+    }
+  }
   for (const s of specs) {
     for (const d of s.depends_on ?? []) {
       if (!byId.has(d)) errors.push(`${s.id}: depends_on "${d}" does not exist`);

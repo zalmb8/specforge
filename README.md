@@ -24,7 +24,7 @@ idea  ->  draft spec  ->  refined, approved spec  ->  built, verified, merged
   - `idea/`: may only add draft specs under `specs/`. No human needed.
   - `spec/`: needs an approving review from a human who is not the PR author, **on the current head commit**. The status stays `pending` until then.
   - `build/`: needs a human only if acceptance criteria, `depends_on` or protected paths change. It also refuses a build whose dependencies are not `done`, and stays `pending` until the spec is `done` and committed AC evidence passes (see [Build](#build)).
-- **Specs can depend on each other.** `depends_on` lists the ids of specs that must be `done` before this one can be built. The validator and gate check the whole tree: every id must exist and there must be no cycles. A spec can be renamed or removed only while it is `draft` or `approved`, and only if no spec still points at the old id, so a rename PR must update every referrer. `implementing` and `done` specs keep their names.
+- **Specs can depend on each other.** `depends_on` lists the ids of specs that must be `done` before this one can be built. The validator and gate check the whole tree: every id must exist and there must be no cycles. A spec can be renamed or removed only while it is `draft` or `approved`, and only if no spec still points at the old id, so a rename PR must update every referrer. `implementing` and `done` specs keep their names, also when archived.
 - **GitHub does the merging.** Agents open the PR, enable native auto-merge as the GitHub App, and stop. Nothing polls or waits. Branch protection, stale-approval dismissal, CODEOWNERS review requests and branch deletion are all native GitHub features.
 - **Reviewers are independent.** A spec is reviewed by fresh agents that did not write it and have no author context, one per lens (testability, scope and risk, codebase fit, consistency). They read the codebase, because a spec cannot be judged without it.
 - **Agents act as your GitHub App, never as you.** If the app is refused, they stop and ask.
@@ -129,6 +129,10 @@ The gate turns `success`, and GitHub merges the PR, only when the spec is `done`
 
 ### Clean up
 
+### Archive
+
+Set `archive: true` in `.specforge/config.yml` and run `node <plugin>/dist/archive.mjs` (dry run) or with `--apply` (set `GH_TOKEN` to the app token first, as the skills do). It opens one `archive/<id>` PR per `done` spec on the default branch, moving the spec and its evidence into `<spec_dir>/archive/`; the gate auto-approves a PR that only moves identical files (a changed `protected_paths` match still needs a human). Archived specs still satisfy `depends_on`. They are immutable, and a `spec/` PR that moves them back is the only restore, with human approval. A spec that has had an `archive/<id>` PR in any state, or has no evidence file, is skipped and reported. Any existing branch named `archive/...` is now held to these rules.
+
 Every flow sweeps first. To run it yourself: `/specforge:sweep` shows what it would remove, then removes it. A worktree is removed only when its PR merged, the local commit is contained in the merged head, the tree is clean and nothing is unpushed. Anything else is listed as stuck with the reason (PR still open, PR closed without merging, uncommitted changes, ...). You can schedule it:
 
 ```
@@ -214,7 +218,7 @@ Specforge runs its own gate, pinned to the last released `@v0` and not the worki
 skills/           idea, refine, build, init, sweep
 agents/           spec-reviewer, code-reviewer, ac-verifier
 lenses/           spec/ and code/, one review lens per file
-src/ dist/        validator, gate, sweep, token minting
+src/ dist/        validator, gate, sweep, archive, token minting
 .github/workflows reusable gate workflow, CI
 templates/        spec, config, gate caller
 ```
