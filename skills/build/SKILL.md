@@ -38,7 +38,7 @@ You are the kickoff session. The build itself runs in its own Orca workspace, in
 >
 > **2. Start.** Set `status: implementing` in the spec and commit it (trailer `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`).
 >
-> **3. Tests first.** For each acceptance criterion, create the thing its `verify` target names (the test file and test name, or the command) so that the target is real and runs. Run them and confirm each fails for the right reason before any implementation. Names must match the `verify` text exactly.
+> **3. Tests first.** For each acceptance criterion, create the thing its `verify` target names (the test file and test name, or the command) so that the target is real and runs. Run them and confirm each fails for the right reason before any implementation. Names must match the `verify` text exactly. Run each `verify` command and confirm it runs only its own test; if a target would run the whole suite or match nothing, say so and fix the target through step 5 instead of living with it.
 >
 > **4. Implement** until `commands.test` and `commands.lint` (when set in the config) pass locally. Never weaken or delete a test to make it pass, and never edit an acceptance criterion to fit the code.
 >

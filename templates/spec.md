@@ -7,7 +7,7 @@ depends_on: []        # ids of specs that must be done before this one can be bu
 acceptance:
   - id: AC-1
     text: <observable behavior>
-    verify: TBD   # test path::name or a command; required once the spec is approved
+    verify: TBD   # required once approved: a command or test that runs ONLY this criterion's check and fails if it is missing
 ---
 
 ## Summary
