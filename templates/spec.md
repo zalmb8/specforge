@@ -3,6 +3,7 @@ specforge: 1
 id: <slug>
 title: <title>
 status: draft
+depends_on: []        # ids of specs that must be done before this one can be built
 acceptance:
   - id: AC-1
     text: <observable behavior>

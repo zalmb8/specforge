@@ -1,7 +1,8 @@
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { parse } from 'yaml';
-import { evaluateGate, hasHumanApproval, gateState, reviewersToRerequest, DEFAULT_PROTECTED } from './gate.mjs';
+import { evaluateGate, hasHumanApproval, gateState, reviewersToRerequest, evidencePath, DEFAULT_PROTECTED } from './gate.mjs';
+import { parseSpec } from './spec.mjs';
 
 // Reports the required commit status `specforge/gate` on the PR head commit.
 // Env (set by the reusable workflow): HEAD_REF, BASE_REF, PR_AUTHOR, PR_HEAD_SHA, PR_NUMBER, GH_TOKEN, GITHUB_REPOSITORY
@@ -26,7 +27,37 @@ const changes = git('diff', '--name-status', '--no-renames', `${baseRef}...HEAD`
     };
   });
 
-const { errors, humanRequired } = evaluateGate({ headRef: env.HEAD_REF, changes, specDir, protectedPaths });
+// Every spec at a ref, reduced to what the dependency and evidence rules need.
+const specsAt = (ref) => {
+  let names = [];
+  try { names = git('ls-tree', '-r', '--name-only', ref, '--', `${specDir}/`).split('\n').filter((n) => n.endsWith('.md')); } catch { /* no spec dir yet */ }
+  return names.map((path) => {
+    const { data } = parseSpec(show(ref, path) ?? '');
+    return data?.id ? { path, id: data.id, status: data.status, depends_on: data.depends_on ?? [], acceptance: data.acceptance ?? [] } : undefined;
+  }).filter(Boolean);
+};
+const baseSpecs = specsAt(baseRef);
+const headSpecs = specsAt('HEAD');
+
+// For a build/ PR: the committed AC evidence, and whether it still describes what ships.
+let evidence;
+if (env.HEAD_REF.startsWith('build/')) {
+  const path = evidencePath(specDir, env.HEAD_REF.slice('build/'.length));
+  let json = null;
+  try { json = JSON.parse(show(env.PR_HEAD_SHA, path) ?? 'null'); } catch { /* malformed: treated as missing */ }
+  let ancestor = false;
+  let changedSince = [];
+  if (json?.sha) {
+    try {
+      git('merge-base', '--is-ancestor', json.sha, env.PR_HEAD_SHA);
+      ancestor = true;
+      changedSince = git('diff', '--name-only', json.sha, env.PR_HEAD_SHA).split('\n').filter(Boolean);
+    } catch { /* not an ancestor, or unknown commit */ }
+  }
+  evidence = { path, json, ancestor, changedSince };
+}
+
+const { errors, humanRequired, pending } = evaluateGate({ headRef: env.HEAD_REF, changes, specDir, protectedPaths, baseSpecs, headSpecs, evidence });
 
 let approved = false;
 let reviews = [];
@@ -41,12 +72,13 @@ if (humanRequired.length && !errors.length) {
 
 const lines = [`### specforge/gate: \`${env.HEAD_REF}\``];
 for (const e of errors) lines.push(`- ❌ ${e}`);
+for (const p of pending) lines.push(`- ⏳ ${p}`);
 for (const h of humanRequired) lines.push(`- ${approved ? '✅' : '⏳'} ${h}${approved ? ' (human approved)' : ' (waiting for human approval)'}`);
-if (!errors.length && !humanRequired.length) lines.push('- ✅ no human approval required');
+if (!errors.length && !pending.length && !humanRequired.length) lines.push('- ✅ no human approval required');
 console.log(lines.join('\n'));
 if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
 
-const { state, description } = gateState({ errors, humanRequired, approved });
+const { state, description } = gateState({ errors, humanRequired, pending, approved });
 const res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/statuses/${env.PR_HEAD_SHA}`, {
   method: 'POST',
   headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
@@ -55,7 +87,7 @@ const res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/s
 if (!res.ok) { console.error(`could not post the gate status: ${res.status} ${await res.text()}`); process.exit(1); }
 console.log(`specforge/gate: ${state} (${description})`);
 // While waiting for a human, ask again whoever's approval went stale. Never fails the gate.
-if (state === 'pending') {
+if (state === 'pending' && humanRequired.length && !approved) {
   try {
     const gh = (path, init = {}) => fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}${path}`, {
       ...init, headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json' },

@@ -37,10 +37,12 @@ You are the kickoff session. The refinement itself happens in its own Orca works
 >
 > **2. Answer open questions.** Take the unchecked items under "Open questions" and put them to the user with AskUserQuestion, grouped so each round is a handful of related questions, with your recommendation first where you have one. For each answer: tick the item (`- [x]`), add the answer to it, and **change the Design and acceptance criteria to reflect it**. A ticked question with an unchanged spec is a defect. New questions that arise go in as new `- [ ]` items and are asked too. Continue until none are unchecked.
 >
+> **2b. Dependencies.** Decide `depends_on` with the user: list the id of every spec this one needs built first, and nothing else. Check each id exists under `<spec_dir>/`. A spec that is built on top of unfinished work cannot be built until its dependencies are `done`, so ask when the prose names a prerequisite.
+>
 > **3. Make it verifiable.** Replace every `verify: TBD` with a concrete target: a test path and name, or a command with an expected result. Ask the user where a target is a real choice.
 >
 > **4. Independent review loop**, at most `loops.spec_review_max` rounds. Each round:
-> - Spawn one `spec-reviewer` agent per lens, in parallel. The lenses are every file in `PLUGIN/lenses/` plus any extra names in `review_lenses` (read from `.specforge/lenses/<name>.md`; a repo file with a built-in's name replaces it; drop names listed in `exclude_lenses`; no duplicates). Each reviewer gets the path to the spec and the full text of exactly one lens. Pass no reasoning, no history, no summary of the conversation.
+> - Spawn one `spec-reviewer` agent per lens, in parallel. The lenses are every file in `PLUGIN/lenses/spec/` plus any extra names in `review_lenses` (read from `.specforge/lenses/spec/<name>.md`; a repo file with a built-in's name replaces it; drop names listed in `exclude_lenses`; no duplicates). Each reviewer gets the path to the spec and the full text of exactly one lens. Pass no reasoning, no history, no summary of the conversation.
 > - Triage every finding yourself, and record the verdict:
 >   - **Valid**: fix it in the spec.
 >   - **Wrong**: push back. Write one line saying why, citing the code or the spec; it goes in the PR description.

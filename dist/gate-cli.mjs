@@ -7374,7 +7374,8 @@ var TRANSITIONS = {
   draft: ["refining", "approved"],
   // a refine PR goes straight from main's draft to approved
   refining: ["draft", "approved"],
-  approved: ["refining", "implementing"],
+  approved: ["refining", "implementing", "done"],
+  // a build PR goes straight from main's approved to done
   implementing: ["approved", "done"],
   done: []
 };
@@ -7417,6 +7418,19 @@ function validateSpec(text, { baseText } = {}) {
     seen.add(ac.id);
     if (!ac.text) errors2.push(`${ac.id}: text is required`);
   }
+  if (data.depends_on !== void 0) {
+    const deps = data.depends_on;
+    if (!Array.isArray(deps)) errors2.push("depends_on must be a list of spec ids");
+    else {
+      const seenDep = /* @__PURE__ */ new Set();
+      for (const d of deps) {
+        if (typeof d !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(d)) errors2.push(`depends_on entry ${JSON.stringify(d)} is not a spec id`);
+        else if (d === data.id) errors2.push("a spec cannot depend on itself");
+        else if (seenDep.has(d)) errors2.push(`duplicate depends_on entry ${d}`);
+        seenDep.add(d);
+      }
+    }
+  }
   const open = openQuestions(body);
   if (BINDING.includes(data.status)) {
     if (open > 0) errors2.push(`${data.status} spec has ${open} open question(s)`);
@@ -7439,20 +7453,77 @@ function validateSpec(text, { baseText } = {}) {
   }
   return { errors: errors2, data, open };
 }
+function validateTree(specs) {
+  const errors2 = [];
+  const byId = new Map(specs.map((s) => [s.id, s]));
+  for (const s of specs) {
+    for (const d of s.depends_on ?? []) {
+      if (!byId.has(d)) errors2.push(`${s.id}: depends_on "${d}" does not exist`);
+    }
+  }
+  const state2 = /* @__PURE__ */ new Map();
+  const walk = (id, path) => {
+    if (state2.get(id) === 2) return;
+    if (state2.get(id) === 1) {
+      errors2.push(`dependency cycle: ${[...path.slice(path.indexOf(id)), id].join(" -> ")}`);
+      return;
+    }
+    state2.set(id, 1);
+    for (const d of byId.get(id)?.depends_on ?? []) if (byId.has(d)) walk(d, [...path, id]);
+    state2.set(id, 2);
+  };
+  for (const s of specs) walk(s.id, []);
+  return [...new Set(errors2)];
+}
 
 // src/gate.mjs
 var DEFAULT_PROTECTED = ["^\\.github/", "^\\.specforge/", "^CODEOWNERS$"];
 var inSpecDir = (specDir2, p) => p.startsWith(`${specDir2}/`) && p.endsWith(".md");
 var acceptanceOf = (text) => JSON.stringify(parseSpec(text ?? "").data?.acceptance ?? null);
-function evaluateGate({ headRef, changes: changes2, specDir: specDir2 = "specs", protectedPaths: protectedPaths2 = DEFAULT_PROTECTED }) {
+var dependsOf = (text) => JSON.stringify(parseSpec(text ?? "").data?.depends_on ?? []);
+var evidencePath = (specDir2, id) => `${specDir2}/evidence/${id}.json`;
+function checkEvidence({ headSpec, evidence: evidence2 }) {
+  if (!evidence2?.json) return [`no AC evidence at ${evidence2?.path}`];
+  const j = evidence2.json;
+  const problems = [];
+  if (j.specforge !== 1 || j.spec !== headSpec.id) problems.push("evidence is for a different spec or schema version");
+  for (const ac of headSpec.acceptance ?? []) {
+    const e = (j.results ?? []).find((r) => r.id === ac.id);
+    if (!e) problems.push(`${ac.id} has no evidence`);
+    else if (e.result !== "pass") problems.push(`${ac.id} did not pass`);
+    else if (e.target !== ac.verify) problems.push(`${ac.id} evidence is for a different verify target`);
+  }
+  if (!evidence2.ancestor) {
+    problems.push("evidence was recorded on a commit that is not part of this PR");
+  } else {
+    const extra = (evidence2.changedSince ?? []).filter((p) => p !== evidence2.path);
+    if (extra.length) problems.push(`files changed after verification: ${extra.slice(0, 5).join(", ")}`);
+  }
+  return problems;
+}
+function evaluateGate({
+  headRef,
+  changes: changes2,
+  specDir: specDir2 = "specs",
+  protectedPaths: protectedPaths2 = DEFAULT_PROTECTED,
+  baseSpecs: baseSpecs2 = [],
+  headSpecs: headSpecs2 = [],
+  evidence: evidence2
+}) {
   const protectedRes = protectedPaths2.map((p) => new RegExp(p));
   const errors2 = [];
   const humanRequired2 = [];
+  const pending2 = [];
   const kind = headRef.split("/")[0];
   const specs = changes2.filter((c) => inSpecDir(specDir2, c.path));
   for (const c of specs) {
     if (c.status === "D") {
-      errors2.push(`${c.path}: specs must not be deleted by a PR`);
+      const baseStatus = parseSpec(c.base ?? "").data?.status;
+      if (!["draft", "approved"].includes(baseStatus)) {
+        errors2.push(`${c.path}: a spec that is ${baseStatus} cannot be deleted or renamed`);
+      } else if (kind === "idea" || kind === "build") {
+        errors2.push(`${c.path}: ${kind}/ branches may not delete specs`);
+      }
       continue;
     }
     const { errors: errs, data } = validateSpec(c.head, { baseText: c.base });
@@ -7460,6 +7531,7 @@ function evaluateGate({ headRef, changes: changes2, specDir: specDir2 = "specs",
     const stem = c.path.split("/").pop().replace(/\.md$/, "");
     if (data?.id && data.id !== stem) errors2.push(`${c.path}: file name must match id (${data.id}.md)`);
   }
+  if (specs.length) errors2.push(...validateTree(headSpecs2));
   if (kind === "idea") {
     for (const c of changes2) {
       if (!inSpecDir(specDir2, c.path)) errors2.push(`${c.path}: idea/ branches may only touch ${specDir2}/**`);
@@ -7478,7 +7550,9 @@ function evaluateGate({ headRef, changes: changes2, specDir: specDir2 = "specs",
       if (!inSpecDir(specDir2, c.path)) errors2.push(`${c.path}: spec/ branches may only touch ${specDir2}/**`);
     }
   } else if (kind === "build") {
+    const id = headRef.slice("build/".length);
     for (const c of specs) {
+      if (c.status === "D") continue;
       const baseStatus = parseSpec(c.base ?? "").data?.status;
       if (!["approved", "implementing"].includes(baseStatus)) {
         errors2.push(`${c.path}: build/ may only touch specs that are approved or implementing`);
@@ -7486,15 +7560,35 @@ function evaluateGate({ headRef, changes: changes2, specDir: specDir2 = "specs",
       if (acceptanceOf(c.base) !== acceptanceOf(c.head)) {
         humanRequired2.push(`${c.path}: acceptance criteria changed during build`);
       }
+      if (dependsOf(c.base) !== dependsOf(c.head)) {
+        humanRequired2.push(`${c.path}: depends_on changed during build`);
+      }
     }
     for (const c of changes2) {
       if (protectedRes.some((re) => re.test(c.path))) humanRequired2.push(`${c.path}: protected path`);
     }
+    const baseSpec = baseSpecs2.find((s) => s.id === id);
+    const headSpec = headSpecs2.find((s) => s.id === id);
+    if (!baseSpec) {
+      errors2.push(`build/${id}: there is no spec "${id}" on the base branch`);
+    } else {
+      for (const dep of baseSpec.depends_on ?? []) {
+        const d = baseSpecs2.find((s) => s.id === dep);
+        if (d?.status !== "done") errors2.push(`depends_on "${dep}" is not done (${d?.status ?? "missing"})`);
+      }
+      if (!headSpec) errors2.push(`build/${id}: spec "${id}" is missing from the PR`);
+      else if (headSpec.status !== "done") pending2.push(`spec ${id} is ${headSpec.status}, not done yet`);
+      else {
+        const problems = checkEvidence({ headSpec, evidence: evidence2 });
+        if (problems.length) pending2.push(`AC evidence: ${problems.join("; ")}`);
+      }
+    }
   }
-  return { errors: errors2, humanRequired: [...new Set(humanRequired2)] };
+  return { errors: errors2, humanRequired: [...new Set(humanRequired2)], pending: pending2 };
 }
-function gateState({ errors: errors2, humanRequired: humanRequired2, approved: approved2 }) {
+function gateState({ errors: errors2, humanRequired: humanRequired2, pending: pending2 = [], approved: approved2 }) {
   if (errors2.length) return { state: "failure", description: errors2[0].slice(0, 130) };
+  if (pending2.length) return { state: "pending", description: pending2[0].slice(0, 130) };
   if (humanRequired2.length && !approved2) return { state: "pending", description: "Waiting for a human approval on the current commit" };
   return { state: "success", description: humanRequired2.length ? "Approved by a human" : "No human approval required" };
 }
@@ -7534,7 +7628,40 @@ var changes = git("diff", "--name-status", "--no-renames", `${baseRef}...HEAD`).
     head: status === "D" ? void 0 : show("HEAD", path)
   };
 });
-var { errors, humanRequired } = evaluateGate({ headRef: env.HEAD_REF, changes, specDir, protectedPaths });
+var specsAt = (ref) => {
+  let names = [];
+  try {
+    names = git("ls-tree", "-r", "--name-only", ref, "--", `${specDir}/`).split("\n").filter((n) => n.endsWith(".md"));
+  } catch {
+  }
+  return names.map((path) => {
+    const { data } = parseSpec(show(ref, path) ?? "");
+    return data?.id ? { path, id: data.id, status: data.status, depends_on: data.depends_on ?? [], acceptance: data.acceptance ?? [] } : void 0;
+  }).filter(Boolean);
+};
+var baseSpecs = specsAt(baseRef);
+var headSpecs = specsAt("HEAD");
+var evidence;
+if (env.HEAD_REF.startsWith("build/")) {
+  const path = evidencePath(specDir, env.HEAD_REF.slice("build/".length));
+  let json = null;
+  try {
+    json = JSON.parse(show(env.PR_HEAD_SHA, path) ?? "null");
+  } catch {
+  }
+  let ancestor = false;
+  let changedSince = [];
+  if (json?.sha) {
+    try {
+      git("merge-base", "--is-ancestor", json.sha, env.PR_HEAD_SHA);
+      ancestor = true;
+      changedSince = git("diff", "--name-only", json.sha, env.PR_HEAD_SHA).split("\n").filter(Boolean);
+    } catch {
+    }
+  }
+  evidence = { path, json, ancestor, changedSince };
+}
+var { errors, humanRequired, pending } = evaluateGate({ headRef: env.HEAD_REF, changes, specDir, protectedPaths, baseSpecs, headSpecs, evidence });
 var approved = false;
 var reviews = [];
 if (humanRequired.length && !errors.length) {
@@ -7550,11 +7677,12 @@ if (humanRequired.length && !errors.length) {
 }
 var lines = [`### specforge/gate: \`${env.HEAD_REF}\``];
 for (const e of errors) lines.push(`- \u274C ${e}`);
+for (const p of pending) lines.push(`- \u23F3 ${p}`);
 for (const h of humanRequired) lines.push(`- ${approved ? "\u2705" : "\u23F3"} ${h}${approved ? " (human approved)" : " (waiting for human approval)"}`);
-if (!errors.length && !humanRequired.length) lines.push("- \u2705 no human approval required");
+if (!errors.length && !pending.length && !humanRequired.length) lines.push("- \u2705 no human approval required");
 console.log(lines.join("\n"));
 if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
-var { state, description } = gateState({ errors, humanRequired, approved });
+var { state, description } = gateState({ errors, humanRequired, pending, approved });
 var res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/statuses/${env.PR_HEAD_SHA}`, {
   method: "POST",
   headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json" },
@@ -7565,7 +7693,7 @@ if (!res.ok) {
   process.exit(1);
 }
 console.log(`specforge/gate: ${state} (${description})`);
-if (state === "pending") {
+if (state === "pending" && humanRequired.length && !approved) {
   try {
     const gh = (path, init = {}) => fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}${path}`, {
       ...init,

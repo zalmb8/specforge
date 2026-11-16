@@ -32,7 +32,10 @@ Releases are manual semver tags, and `v0` is the floating tag adopting repos pin
 - Rulesets match the target branch only. "A `spec/` PR needs a human, an `idea/` PR does not" cannot be expressed natively, which is why the gate exists and keys on the head branch prefix.
 - The gate job holds `pull-requests: write` so it can re-request review when a push makes an approval stale (GitHub dismisses but does not re-request). It runs only the pinned release, never PR code.
 - Approval counts only on the current head commit. GitHub keeps an approval attached when a push merely merges the base branch in, since the reviewed diff is unchanged.
-- Spec files are `<spec_dir>/<id>.md` and the file name must equal the `id`. No frontmatter fields beyond the documented schema.
+- Spec files are `<spec_dir>/<id>.md` and the file name must equal the `id`. No frontmatter fields beyond the documented schema; `depends_on` is the one optional addition. A rename or delete must keep the dependency tree intact, and only `draft`/`approved` specs can be renamed.
+- A build PR is `pending` until the spec is `done` with passing AC evidence at `<spec_dir>/evidence/<id>.json`. The evidence commit may change only that file. When a flow verifies work, an independent agent does it; the author never self-certifies.
+- Build workers ask the user only in the cases listed in the build skill, and never get around a refused permission with the user's credentials.
+- `gh run watch <id> --exit-status` waits for CI; `gh pr checks --watch` would hang forever on the gate's own pending status.
 - Skills receive `${CLAUDE_PLUGIN_ROOT}` but spawned workers do not. When a skill hands work to another agent, write the literal path into the brief, and tell the worker to use it exactly as written.
 - Spawned workers cannot read outside their worktree without a permission prompt, which stalls an unattended run. `init` allow-lists the plugin cache directory in the repo's uncommitted `.claude/settings.local.json`. Briefs go in a gitignored `.specforge/brief.md` inside the worktree, never in a scratch path.
 - Launch a worker's agent only after its brief exists, and check `launch.prompt.outcome` is `journaled` or `handed-to-terminal`. An empty launch leaves an idle agent that looks like success.
@@ -52,9 +55,9 @@ Unit tests are not enough. Both bugs that mattered most were invisible to them: 
 ## Layout
 
 ```
-skills/      idea, refine, build (not implemented), init, sweep
-agents/      spec-reviewer (shared rules only; the caller injects one lens)
-lenses/      one review lens per file; all built-ins always run
+skills/      idea, refine, build, init, sweep
+agents/      spec-reviewer, code-reviewer (shared rules only; the caller injects one lens), ac-verifier
+lenses/      spec/ and code/, one review lens per file; all built-ins always run
 src/ dist/   validator (spec.mjs), gate (gate.mjs, gate-cli.mjs), sweep, token minting
 templates/   spec, config, gate caller
 .github/     reusable gate workflow (gate.yml), CI

@@ -17,3 +17,5 @@ loops:
   code_review_max: 3
 review_lenses: []
 exclude_lenses: []
+code_review_lenses: []
+exclude_code_lenses: []
