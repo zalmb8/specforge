@@ -10,6 +10,10 @@ jobs:
   gate:
     name: specforge/gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write       # the gate reports the required `specforge/gate` commit status
     steps:
       - uses: actions/checkout@v4
         with:

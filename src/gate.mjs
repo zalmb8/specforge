@@ -71,6 +71,15 @@ export function evaluateGate({ headRef, changes, specDir = 'specs', protectedPat
 
 // An approval only counts for the commit it was given on: a push after the review makes it stale,
 // so the author can't change a spec after sign-off. `headSha` is the PR head, not the merge commit.
+// The commit status the gate reports. Statuses are replaced per context, so approving flips
+// pending to success; separate check runs from different events never replace one another,
+// and GitHub would keep the old red one blocking the merge.
+export function gateState({ errors, humanRequired, approved }) {
+  if (errors.length) return { state: 'failure', description: errors[0].slice(0, 130) };
+  if (humanRequired.length && !approved) return { state: 'pending', description: 'Waiting for a human approval on the current commit' };
+  return { state: 'success', description: humanRequired.length ? 'Approved by a human' : 'No human approval required' };
+}
+
 export function hasHumanApproval(reviews, prAuthor, headSha) {
   const latest = new Map();
   for (const r of reviews) latest.set(r.user?.login, r);

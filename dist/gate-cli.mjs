@@ -278,7 +278,7 @@ var require_directives = __commonJS({
        * update the stream state according to the current version's spec.
        */
       atDocument() {
-        const res = new _Directives(this.yaml, this.tags);
+        const res2 = new _Directives(this.yaml, this.tags);
         switch (this.yaml.version) {
           case "1.1":
             this.atNextDocument = true;
@@ -292,7 +292,7 @@ var require_directives = __commonJS({
             this.tags = Object.assign({}, _Directives.defaultTags);
             break;
         }
-        return res;
+        return res2;
       }
       /**
        * @param onError - May be called even if the action was successful
@@ -550,14 +550,14 @@ var require_toJS = __commonJS({
           return value.toJSON(arg, ctx);
         const data = { aliasCount: 0, count: 1, res: void 0 };
         ctx.anchors.set(value, data);
-        ctx.onCreate = (res2) => {
-          data.res = res2;
+        ctx.onCreate = (res3) => {
+          data.res = res3;
           delete ctx.onCreate;
         };
-        const res = value.toJSON(arg, ctx);
+        const res2 = value.toJSON(arg, ctx);
         if (ctx.onCreate)
-          ctx.onCreate(res);
-        return res;
+          ctx.onCreate(res2);
+        return res2;
       }
       if (typeof value === "bigint" && !ctx?.keep)
         return Number(value);
@@ -597,11 +597,11 @@ var require_Node = __commonJS({
           mapKeyWarned: false,
           maxAliasCount: typeof maxAliasCount === "number" ? maxAliasCount : 100
         };
-        const res = toJS.toJS(this, "", ctx);
+        const res2 = toJS.toJS(this, "", ctx);
         if (typeof onAnchor === "function")
-          for (const { count, res: res2 } of ctx.anchors.values())
-            onAnchor(res2, count);
-        return typeof reviver === "function" ? applyReviver.applyReviver(reviver, { "": res }, "", res) : res;
+          for (const { count, res: res3 } of ctx.anchors.values())
+            onAnchor(res3, count);
+        return typeof reviver === "function" ? applyReviver.applyReviver(reviver, { "": res2 }, "", res2) : res2;
       }
     };
     exports.NodeBase = NodeBase;
@@ -1086,21 +1086,21 @@ var require_foldFlowLines = __commonJS({
         return text;
       if (onFold)
         onFold();
-      let res = text.slice(0, folds[0]);
+      let res2 = text.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
         const end2 = folds[i2 + 1] || text.length;
         if (fold === 0)
-          res = `
+          res2 = `
 ${indent}${text.slice(0, end2)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text[fold]}\\`;
-          res += `
+            res2 += `${text[fold]}\\`;
+          res2 += `
 ${indent}${text.slice(fold + 1, end2)}`;
         }
       }
-      return res;
+      return res2;
     }
     function consumeMoreIndentedLines(text, i, indent) {
       let end = i;
@@ -1241,9 +1241,9 @@ var require_stringifyString = __commonJS({
       if (ctx.options.singleQuote === false || ctx.implicitKey && value.includes("\n") || /[ \t]\n|\n[ \t]/.test(value))
         return doubleQuotedString(value, ctx);
       const indent = ctx.indent || (containsDocumentMarker(value) ? "  " : "");
-      const res = "'" + value.replace(/'/g, "''").replace(/\n+/g, `$&
+      const res2 = "'" + value.replace(/'/g, "''").replace(/\n+/g, `$&
 ${indent}`) + "'";
-      return ctx.implicitKey ? res : foldFlowLines.foldFlowLines(res, indent, foldFlowLines.FOLD_FLOW, getFoldOptions(ctx, false));
+      return ctx.implicitKey ? res2 : foldFlowLines.foldFlowLines(res2, indent, foldFlowLines.FOLD_FLOW, getFoldOptions(ctx, false));
     }
     function quotedString(value, ctx) {
       const { singleQuote } = ctx.options;
@@ -1396,15 +1396,15 @@ ${indent}`);
             return null;
         }
       };
-      let res = _stringify(type);
-      if (res === null) {
+      let res2 = _stringify(type);
+      if (res2 === null) {
         const { defaultKeyType, defaultStringType } = ctx.options;
         const t = implicitKey && defaultKeyType || defaultStringType;
-        res = _stringify(t);
-        if (res === null)
+        res2 = _stringify(t);
+        if (res2 === null)
           throw new Error(`Unsupported default string type ${t}`);
       }
-      return res;
+      return res2;
     }
     exports.stringifyString = stringifyString;
   }
@@ -3062,8 +3062,8 @@ var require_timestamp = __commonJS({
       const sign = str[0];
       const parts = sign === "-" || sign === "+" ? str.substring(1) : str;
       const num = (n) => asBigInt ? BigInt(n) : Number(n);
-      const res = parts.replace(/_/g, "").split(":").reduce((res2, p) => res2 * num(60) + num(p), num(0));
-      return sign === "-" ? num(-1) * res : res;
+      const res2 = parts.replace(/_/g, "").split(":").reduce((res3, p) => res3 * num(60) + num(p), num(0));
+      return sign === "-" ? num(-1) * res2 : res2;
     }
     function stringifySexagesimal(node) {
       let { value } = node;
@@ -3665,11 +3665,11 @@ var require_Document = __commonJS({
           mapKeyWarned: false,
           maxAliasCount: typeof maxAliasCount === "number" ? maxAliasCount : 100
         };
-        const res = toJS.toJS(this.contents, jsonArg ?? "", ctx);
+        const res2 = toJS.toJS(this.contents, jsonArg ?? "", ctx);
         if (typeof onAnchor === "function")
-          for (const { count, res: res2 } of ctx.anchors.values())
-            onAnchor(res2, count);
-        return typeof reviver === "function" ? applyReviver.applyReviver(reviver, { "": res }, "", res) : res;
+          for (const { count, res: res3 } of ctx.anchors.values())
+            onAnchor(res3, count);
+        return typeof reviver === "function" ? applyReviver.applyReviver(reviver, { "": res2 }, "", res2) : res2;
       }
       /**
        * A JSON representation of the document `contents`.
@@ -4424,8 +4424,8 @@ var require_compose_collection = __commonJS({
         }
       }
       const coll = resolveCollection(CN, ctx, token, onError, tagName, tag);
-      const res = tag.resolve?.(coll, (msg) => onError(tagToken, "TAG_RESOLVE_FAILED", msg), ctx.options) ?? coll;
-      const node = identity.isNode(res) ? res : new Scalar.Scalar(res);
+      const res2 = tag.resolve?.(coll, (msg) => onError(tagToken, "TAG_RESOLVE_FAILED", msg), ctx.options) ?? coll;
+      const node = identity.isNode(res2) ? res2 : new Scalar.Scalar(res2);
       node.range = coll.range;
       node.tag = tagName;
       if (tag?.format)
@@ -4708,18 +4708,18 @@ var require_resolve_flow_scalar = __commonJS({
         trimEnd = /[ \t]+$/;
         trimBoth = /^[ \t]+|[ \t]+$/g;
       }
-      let res = match[1].replace(trimEnd, "");
+      let res2 = match[1].replace(trimEnd, "");
       let sep = " ";
       let pos = line.lastIndex;
       while (match = line.exec(source)) {
         const lm = match[1].replace(trimBoth, "");
         if (lm === "") {
           if (sep === "\n")
-            res += sep;
+            res2 += sep;
           else
             sep = "\n";
         } else {
-          res += sep + lm;
+          res2 += sep + lm;
           sep = " ";
         }
         pos = line.lastIndex;
@@ -4727,23 +4727,23 @@ var require_resolve_flow_scalar = __commonJS({
       const last = /[ \t]*(.*)/sy;
       last.lastIndex = pos;
       match = last.exec(source);
-      return res + sep + (match?.[1] ?? "");
+      return res2 + sep + (match?.[1] ?? "");
     }
     function doubleQuotedValue(source, onError) {
-      let res = "";
+      let res2 = "";
       for (let i = 1; i < source.length - 1; ++i) {
         const ch = source[i];
         if (ch === "\r" && source[i + 1] === "\n")
           continue;
         if (ch === "\n") {
           const { fold, offset } = foldNewline(source, i);
-          res += fold;
+          res2 += fold;
           i = offset;
         } else if (ch === "\\") {
           let next = source[++i];
           const cc = escapeCodes[next];
           if (cc)
-            res += cc;
+            res2 += cc;
           else if (next === "\n") {
             next = source[i + 1];
             while (next === " " || next === "	")
@@ -4754,12 +4754,12 @@ var require_resolve_flow_scalar = __commonJS({
               next = source[++i + 1];
           } else if (next === "x" || next === "u" || next === "U") {
             const length = next === "x" ? 2 : next === "u" ? 4 : 8;
-            res += parseCharCode(source, i + 1, length, onError);
+            res2 += parseCharCode(source, i + 1, length, onError);
             i += length;
           } else {
             const raw = source.substr(i - 1, 2);
             onError(i - 1, "BAD_DQ_ESCAPE", `Invalid escape sequence ${raw}`);
-            res += raw;
+            res2 += raw;
           }
         } else if (ch === " " || ch === "	") {
           const wsStart = i;
@@ -4767,14 +4767,14 @@ var require_resolve_flow_scalar = __commonJS({
           while (next === " " || next === "	")
             next = source[++i + 1];
           if (next !== "\n" && !(next === "\r" && source[i + 2] === "\n"))
-            res += i > wsStart ? source.slice(wsStart, i + 1) : ch;
+            res2 += i > wsStart ? source.slice(wsStart, i + 1) : ch;
         } else {
-          res += ch;
+          res2 += ch;
         }
       }
       if (source[source.length - 1] !== '"' || source.length === 1)
         onError(source.length, "MISSING_CHAR", 'Missing closing "quote');
-      return res;
+      return res2;
     }
     function foldNewline(source, offset) {
       let fold = "";
@@ -4862,8 +4862,8 @@ var require_compose_scalar = __commonJS({
         tag = ctx.schema[identity.SCALAR];
       let scalar;
       try {
-        const res = tag.resolve(value, (msg) => onError(tagToken ?? token, "TAG_RESOLVE_FAILED", msg), ctx.options);
-        scalar = identity.isScalar(res) ? res : new Scalar.Scalar(res);
+        const res2 = tag.resolve(value, (msg) => onError(tagToken ?? token, "TAG_RESOLVE_FAILED", msg), ctx.options);
+        scalar = identity.isScalar(res2) ? res2 : new Scalar.Scalar(res2);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         onError(tagToken ?? token, "TAG_RESOLVE_FAILED", msg);
@@ -5501,54 +5501,54 @@ var require_cst_stringify = __commonJS({
     function stringifyToken(token) {
       switch (token.type) {
         case "block-scalar": {
-          let res = "";
+          let res2 = "";
           for (const tok of token.props)
-            res += stringifyToken(tok);
-          return res + token.source;
+            res2 += stringifyToken(tok);
+          return res2 + token.source;
         }
         case "block-map":
         case "block-seq": {
-          let res = "";
+          let res2 = "";
           for (const item of token.items)
-            res += stringifyItem(item);
-          return res;
+            res2 += stringifyItem(item);
+          return res2;
         }
         case "flow-collection": {
-          let res = token.start.source;
+          let res2 = token.start.source;
           for (const item of token.items)
-            res += stringifyItem(item);
+            res2 += stringifyItem(item);
           for (const st of token.end)
-            res += st.source;
-          return res;
+            res2 += st.source;
+          return res2;
         }
         case "document": {
-          let res = stringifyItem(token);
+          let res2 = stringifyItem(token);
           if (token.end)
             for (const st of token.end)
-              res += st.source;
-          return res;
+              res2 += st.source;
+          return res2;
         }
         default: {
-          let res = token.source;
+          let res2 = token.source;
           if ("end" in token && token.end)
             for (const st of token.end)
-              res += st.source;
-          return res;
+              res2 += st.source;
+          return res2;
         }
       }
     }
     function stringifyItem({ start, key, sep, value }) {
-      let res = "";
+      let res2 = "";
       for (const st of start)
-        res += st.source;
+        res2 += st.source;
       if (key)
-        res += stringifyToken(key);
+        res2 += stringifyToken(key);
       if (sep)
         for (const st of sep)
-          res += st.source;
+          res2 += st.source;
       if (value)
-        res += stringifyToken(value);
-      return res;
+        res2 += stringifyToken(value);
+      return res2;
     }
     exports.stringify = stringify;
   }
@@ -5821,11 +5821,11 @@ var require_lexer = __commonJS({
       hasChars(n) {
         return this.pos + n <= this.buffer.length;
       }
-      setNext(state) {
+      setNext(state2) {
         this.buffer = this.buffer.substring(this.pos);
         this.pos = 0;
         this.lineEndPos = null;
-        this.next = state;
+        this.next = state2;
         return null;
       }
       peek(n) {
@@ -7493,6 +7493,11 @@ function evaluateGate({ headRef, changes: changes2, specDir: specDir2 = "specs",
   }
   return { errors: errors2, humanRequired: [...new Set(humanRequired2)] };
 }
+function gateState({ errors: errors2, humanRequired: humanRequired2, approved: approved2 }) {
+  if (errors2.length) return { state: "failure", description: errors2[0].slice(0, 130) };
+  if (humanRequired2.length && !approved2) return { state: "pending", description: "Waiting for a human approval on the current commit" };
+  return { state: "success", description: humanRequired2.length ? "Approved by a human" : "No human approval required" };
+}
 function hasHumanApproval(reviews, prAuthor, headSha) {
   const latest = /* @__PURE__ */ new Map();
   for (const r of reviews) latest.set(r.user?.login, r);
@@ -7527,14 +7532,14 @@ var changes = git("diff", "--name-status", "--no-renames", `${baseRef}...HEAD`).
 var { errors, humanRequired } = evaluateGate({ headRef: env.HEAD_REF, changes, specDir, protectedPaths });
 var approved = false;
 if (humanRequired.length && !errors.length) {
-  const res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/pulls/${env.PR_NUMBER}/reviews?per_page=100`, {
+  const res2 = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/pulls/${env.PR_NUMBER}/reviews?per_page=100`, {
     headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json" }
   });
-  if (!res.ok) {
-    console.error(`could not list reviews: ${res.status}`);
+  if (!res2.ok) {
+    console.error(`could not list reviews: ${res2.status}`);
     process.exit(1);
   }
-  approved = hasHumanApproval(await res.json(), env.PR_AUTHOR, env.PR_HEAD_SHA);
+  approved = hasHumanApproval(await res2.json(), env.PR_AUTHOR, env.PR_HEAD_SHA);
 }
 var lines = [`### specforge/gate: \`${env.HEAD_REF}\``];
 for (const e of errors) lines.push(`- \u274C ${e}`);
@@ -7542,4 +7547,15 @@ for (const h of humanRequired) lines.push(`- ${approved ? "\u2705" : "\u23F3"} $
 if (!errors.length && !humanRequired.length) lines.push("- \u2705 no human approval required");
 console.log(lines.join("\n"));
 if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
-process.exit(errors.length || humanRequired.length && !approved ? 1 : 0);
+var { state, description } = gateState({ errors, humanRequired, approved });
+var res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/statuses/${env.PR_HEAD_SHA}`, {
+  method: "POST",
+  headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json" },
+  body: JSON.stringify({ state, context: "specforge/gate", description, target_url: `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` })
+});
+if (!res.ok) {
+  console.error(`could not post the gate status: ${res.status} ${await res.text()}`);
+  process.exit(1);
+}
+console.log(`specforge/gate: ${state} (${description})`);
+process.exit(state === "failure" ? 1 : 0);
