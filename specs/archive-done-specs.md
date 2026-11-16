@@ -2,7 +2,7 @@
 specforge: 1
 id: archive-done-specs
 title: Archive location for done specs
-status: implementing
+status: done
 depends_on: []        # ids of specs that must be done before this one can be built
 acceptance:
   - id: AC-1
