@@ -165,3 +165,13 @@ test('human approval counts only for the current head commit', () => {
   assert.equal(hasHumanApproval([r('zach', 'aaa')], 'app[bot]', 'bbb'), false); // pushed after approval
   assert.equal(hasHumanApproval([r('zach', 'aaa')], 'app[bot]'), true); // no head sha known: not enforced
 });
+
+import { staleApprovals } from '../src/dismiss-stale.mjs';
+
+test('staleApprovals picks human approvals on older commits only', () => {
+  const r = (login, commit_id, state = 'APPROVED', type = 'User') => ({ id: login, user: { login, type }, state, commit_id });
+  assert.deepEqual(staleApprovals([r('zach', 'old')], 'new', 'app').map((x) => x.id), ['zach']);
+  assert.deepEqual(staleApprovals([r('zach', 'new')], 'new', 'app'), []);
+  assert.deepEqual(staleApprovals([r('zach', 'old'), r('zach', 'old', 'CHANGES_REQUESTED')], 'new', 'app'), []); // superseded
+  assert.deepEqual(staleApprovals([r('bot', 'old', 'APPROVED', 'Bot'), r('app', 'old')], 'new', 'app'), []); // bots and the author never count
+});
