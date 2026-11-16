@@ -21,8 +21,10 @@ function latestPerName(runs) {
  * Returns { state: 'merge' | 'wait' | 'refuse', reason }.
  * Refuses (never merges) unless the specforge gate ran and every check passed.
  */
-export function decideMerge(allRuns, { awaitingHuman = false } = {}) {
-  const checkRuns = latestPerName(allRuns);
+export function decideMerge(allRuns, { awaitingHuman = false, ignoreJob } = {}) {
+  // The merge job calls this while its own check is still running; it must not wait on itself.
+  const others = ignoreJob ? allRuns.filter((r) => r.name !== ignoreJob && !r.name.endsWith(` / ${ignoreJob}`)) : allRuns;
+  const checkRuns = latestPerName(others);
   const gate = checkRuns.find((r) => GATE.test(r.name));
   if (!gate) return { state: 'wait', reason: 'specforge/gate has not reported yet' };
   const pending = checkRuns.filter((r) => r.status !== 'completed');

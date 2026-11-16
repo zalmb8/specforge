@@ -1,0 +1,29 @@
+name: specforge merge on approval (reusable)
+# Merges a spec/ PR once a human approves it and the gate is green. No agent session is
+# involved, so nothing waits and no tokens are spent. Opt in from a repo's caller workflow.
+on:
+  workflow_call:
+    inputs:
+      specforge_ref:
+        description: Tag of specforge whose dist/ to run. Keep in step with the @ref the caller uses.
+        type: string
+        default: v0
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: zalmb8/specforge
+          ref: ${{ inputs.specforge_ref }}
+          path: .specforge-tool
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Merge through the guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .specforge-tool/dist/merge-pr.mjs "${{ github.repository }}" "${{ github.event.pull_request.number }}" --timeout-s 120 --ignore-job merge
