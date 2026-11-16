@@ -3,7 +3,7 @@ specforge: 1
 id: orca-sweep-automation
 title: Orca Automation for the sweep
 status: draft
-depends_on: []        # ids of specs that must be done before this one can be built
+depends_on: [archive-done-specs]        # ids of specs that must be done before this one can be built
 acceptance:
   - id: AC-1
     text: "The documentation names the exact `orca automations create` invocation for the sweep automation."
