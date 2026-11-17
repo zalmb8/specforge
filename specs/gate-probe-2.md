@@ -2,7 +2,7 @@
 specforge: 1
 id: gate-probe-2
 title: Docs-only gate probe
-status: approved
+status: done
 depends_on: []
 acceptance:
   - id: AC-1

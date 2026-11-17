@@ -1,0 +1,8 @@
+{
+  "specforge": 1,
+  "spec": "gate-probe-2",
+  "sha": "a93f31a0d121ea4483051d2bef30db65fbdfa788",
+  "results": [
+    { "id": "AC-1", "target": "test -f docs/gate-probe.txt", "result": "pass", "detail": "ran `test -f docs/gate-probe.txt`; exit=0, file exists" }
+  ]
+}
