@@ -1,6 +1,7 @@
 specforge: 1
 spec_dir: specs
 default_branch: main
+archive: true
 # specforge's own safety rails: the build flow must never auto-merge edits to these.
 # (.github/, .specforge/ and CODEOWNERS are always protected by default.)
 protected_paths:
